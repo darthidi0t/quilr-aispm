@@ -983,7 +983,11 @@ V.gwModel=()=>{
   ${panel('Not routed through the gateway','Agents calling models directly, so they have no runtime protection.',`<div class="list">${[['Collections Voice Summariser','SageMaker endpoint called from Lambda','high'],['content-gen (GKE)','direct to api.anthropic.com · found in flow logs','high'],['doc-summariser (AKS)','direct to api.mistral.ai','high'],['Treasury FX Copilot','Azure OpenAI key in app config','medium'],['research-nb-03','Hugging Face inference API','medium'],['marketing-briefs','Gemini consumer API key','medium'],['qa-test-agent','dev only · no customer data','low']].map(r=>`<div class="li"><div class="a"><div>${r[0]}</div><div class="sub" style="text-transform:none">${r[1]}</div></div>${pill(r[2])}</div>`).join('')}</div>`,'<button class="btn" data-toast="Onboarding guide sent to 7 owners">Onboard all</button>')}
  </div>
  ${panel('MITRE ATLAS coverage','Gateway detections in the last 30 days by tactic and technique. Darker cells saw more activity.',`<div style="overflow-x:auto"><div class="atlas">${ATL.map(c=>`<div class="col"><h4>${c[0]}</h4>${c[1].map(t=>{const p=Math.min(70,Math.round(Math.log10(t[2]+1)/Math.log10(413)*70));return `<div class="cell" style="background:color-mix(in srgb, var(--high) ${p}%, var(--panel-2))"><b>${t[0]}<span>${t[2]}</span></b>${t[1]}</div>`}).join('')}</div>`).join('')}</div></div>`)}
- ${panel('Model theft & poisoning','Low-volume, high-impact signals from the gateway and pipeline sensors.',`<div class="list">${[['Model extraction','fraud-model-v7 · 6,000 near-duplicate queries from 3 IPs (gateway rate analytics)','critical'],['Distillation pattern','gpt-4o-prod-eus2 · systematic output harvesting (gateway)','high'],['Weights copied','s3://nwf-models/credit-pd · cross-account GetObject (CloudTrail)','critical'],['Label flipping','txn-fraud-train-2026Q3 · 1.8% labels changed in last ingest (pipeline)','critical'],['Poisoned RAG doc','credit-policy-index · hidden instructions in PDF (gateway, retrieval stage)','high']].map(r=>`<div class="li"><div class="a"><div>${r[0]}</div><div class="sub" style="text-transform:none">${r[1]}</div></div>${pill(r[2])}</div>`).join('')}</div>`)}`;
+ ${panel('Gateway detector telemetry','Every detector running inline or asynchronously in the gateway, with coverage, added latency and accuracy. Select a detector for its telemetry record.',tbl(['Detector','Class','Stage','>Assets','>p95 ms','>Detections · 24h','>TP rate','>FP rate','Version'],GDET.map(d=>`<tr data-det="${esc(d.n)}"><td>${esc(d.n)}</td><td><span class="tag">${d.cls}</span></td><td class="muted nowrap">${d.stage}</td><td class="r num">${d.cov}</td><td class="r num">${d.p95||'<span class="dim">async</span>'}</td><td class="r num">${fmt(d.hits)}</td><td class="r mono c-ok">${d.tp}</td><td class="r mono ${parseFloat(d.fp)>3?'c-med':''}">${d.fp}</td><td class="mono">${d.ver}</td></tr>`)))}
+ <div class="grid g2">
+  ${panel('Adversarial attack detection',`${ADV.length} detections in the last 24 hours — extraction, evasion, inference and perturbation attacks against models.`,`<div class="list">${ADV.slice(0,5).map(a=>`<div class="li" data-adv="${a.id}"><div class="a"><div>${esc(a.cls)}</div><div class="sub" style="text-transform:none">${esc(a.model)} · ${a.det} · ${a.atlas}</div></div>${pill(a.sev)}</div>`).join('')}</div>`,'<button class="btn" data-seg="gw" data-v="Adversarial attacks">Open</button>')}
+  ${panel('Data poisoning detection',`${POIS.length} detections across ${[...new Set(POIS.map(p=>p.target))].length} corpora — training sets, RAG indexes, embedding stores and model weights.`,`<div class="list">${POIS.slice(0,5).map(p=>`<div class="li" data-pois="${p.id}"><div class="a"><div>${esc(p.vec)}</div><div class="sub" style="text-transform:none">${esc(p.target)} · ${p.det} · ${p.pct}</div></div>${pill(p.sev)}</div>`).join('')}</div>`,'<button class="btn" data-seg="gw" data-v="Data poisoning">Open</button>')}
+ </div>`;
 };
 
 V.risk=()=>{
@@ -2213,7 +2217,7 @@ function mcpView(){
  ${panel('Agent identities','Registered agents, how they prove identity, and what they may call. Select one for its inline controls.',tbl(['Agent','Agent ID','Attestation','On behalf of','Scopes','Binding'],ags.map(g=>{const d=agIdent(g);return `<tr data-asset="${g.id}" data-asset-pane="5"><td>${esc(g.name)}</td><td class="mono">${d.id}</td><td>${d.attest}</td><td class="muted">${d.obo}</td><td>${d.scopes.map(s=>`<span class="tag">${s}</span>`).join('')}</td><td class="mono">${d.binding.split(' ')[0]}</td></tr>`})))}`;
 }
 
-V.threats=()=>`${seg('gw',['Model traffic','MCP gateway'])}${state.sub.gw==='MCP gateway'?mcpView():V.gwModel()}`;
+V.threats=()=>{const g=state.sub.gw;return `${seg('gw',['Model traffic','Adversarial attacks','Data poisoning','MCP gateway'])}${g==='MCP gateway'?mcpView():g==='Adversarial attacks'?V.gwAdv():g==='Data poisoning'?V.gwPoison():V.gwModel()}`};
 /* ---------------- Attack paths (data-driven) ---------------- */
 const vFor=(name,tk)=>VIOL.find(v=>{const a=vAsset(v);return a&&a.name===name&&v.tk===tk});
 const dsFind=f=>DS.find(f);
@@ -2838,6 +2842,139 @@ V.posture=()=>{
  </div>`;
 };
 
+/* ---------------- AI Gateway · adversarial & poisoning telemetry ---------------- */
+const ADV=[
+ ['ADV-001','11:21','Model extraction','AML.T0024','fraud-model-v7','Inference API','Query-pattern analysis',.96,6000,'near-duplicate ratio','0.94','45.118.62.0/24','svc-mktg-automation','block','critical','Open','6,000 near-duplicate scoring queries varying one feature at a time — consistent with training a surrogate model.'],
+ ['ADV-002','11:04','Evasion · adversarial example','AML.T0015','fraud-model-v7','Inference API','Perturbation norm detector',.91,142,'L∞ perturbation','0.031','103.21.44.9','partner-api','block','high','Open','Transaction features perturbed inside an L∞ ball to flip fraud → legitimate while keeping the record plausible.'],
+ ['ADV-003','10:52','Adversarial suffix (GCG)','AML.T0054','gpt-4o-prod-eus2','Prompt','Adversarial-suffix classifier',.97,38,'suffix entropy','7.8','49.36.118.40','employee · Mumbai HQ','block','high','Open','Gradient-crafted token suffix appended to a benign request to force a policy bypass.'],
+ ['ADV-004','10:40','Membership inference','AML.T0024','credit-pd-xgb-v12','Inference API','Confidence-distribution anomaly',.88,2400,'confidence gap','0.42','10.42.4.18','branch-user · Nashik-02','alert','high','Investigating','Repeated probing of borderline applicants to infer whether a record was in the training set.'],
+ ['ADV-005','10:18','Model inversion','AML.T0024','text-embedding-3-large','Embedding API','Input-similarity clustering',.84,9400,'reconstruction score','0.61','203.0.113.42','partner-api','alert','medium','Investigating','High-volume embedding queries used to reconstruct source document text.'],
+ ['ADV-006','09:58','Adversarial patch (vision)','AML.T0043','resnet50-doc-classifier','Vision input','Patch detector',.93,17,'patch area','4.2%','13.234.88.19','ops-kyc-batch','block','high','Open','Printed sticker pattern on cheque images forcing a misclassification of the amount field.'],
+ ['ADV-007','09:41','Audio perturbation','AML.T0043','whisper-large-v3','Audio input','Spectral anomaly detector',.79,23,'SNR delta','−18 dB','10.20.11.38','contact-centre','alert','medium','Open','Near-inaudible high-frequency perturbation altering transcription of account numbers.'],
+ ['ADV-008','09:22','Transfer attack','AML.T0043','llama-3.1-8b-collections-ft','Prompt','OOD score',.86,61,'OOD score','0.88','10.30.9.14','dev-sandbox-17','block','medium','Open','Adversarial prompts crafted against an open model and replayed at the fine-tune.'],
+ ['ADV-009','08:55','Query-based black-box probe','AML.T0040','anthropic.claude-sonnet-4','Inference API','Rate & budget analytics',.82,1180,'queries/min','340','203.0.113.42','partner-api','alert','medium','Investigating','Systematic boundary probing with minimal input variation.'],
+ ['ADV-010','08:30','Embedding collision','AML.T0043','text-embedding-3-large','Embedding API','Input-similarity clustering',.77,310,'cosine collision','0.991','10.20.6.21','rag-indexer','alert','low','Open','Crafted inputs colliding with high-value document embeddings to hijack retrieval.'],
+ ['ADV-011','08:02','Evasion · adversarial example','AML.T0015','credit-pd-xgb-v12','Inference API','Perturbation norm detector',.89,76,'L2 perturbation','0.14','122.161.50.7','branch-user · Delhi','block','high','Open','Income and tenure fields nudged to cross the approval threshold.'],
+ ['ADV-012','07:44','Model extraction','AML.T0024','gpt-4o-prod-eus2','Inference API','Query-pattern analysis',.90,4200,'distillation score','0.87','45.118.62.0/24','svc-mktg-automation','alert','high','Investigating','Systematic output harvesting across a broad prompt grid.'],
+ ['ADV-013','07:20','Denial of ML service','AML.T0029','collections-ep','Inference API','Rate & budget analytics',.95,22000,'tokens/min','410k','103.21.44.9','unknown','block','high','Contained','Token flood driving cost and latency on the collections endpoint.'],
+ ['ADV-014','06:58','Adversarial suffix (GCG)','AML.T0054','agentforce-reasoner','Prompt','Adversarial-suffix classifier',.92,14,'suffix entropy','7.1','103.21.44.9','customer chat · web','block','medium','Open','Suffix attack against the customer-facing service agent.'],
+ ['ADV-015','06:33','Membership inference','AML.T0024','fraud-model-v7','Inference API','Confidence-distribution anomaly',.81,1900,'confidence gap','0.37','10.20.11.38','svc-fraud-batch','alert','medium','Investigating','Confidence sampling across known and synthetic records.'],
+ ['ADV-016','06:10','Evasion · adversarial example','AML.T0015','resnet50-doc-classifier','Vision input','OOD score',.85,44,'OOD score','0.91','13.234.88.19','ops-kyc','alert','medium','Open','Out-of-distribution document scans that defeat the classifier.'],
+ ['ADV-017','05:48','Model extraction','AML.T0024','credit-pd-xgb-v12','Inference API','Query-pattern analysis',.78,980,'near-duplicate ratio','0.72','10.42.4.22','analyst-07','alert','low','Closed','Internal analyst bulk scoring; confirmed legitimate after review.'],
+ ['ADV-018','05:12','Transfer attack','AML.T0043','gpt-4o-prod-eus2','Prompt','Adversarial-suffix classifier',.74,29,'suffix entropy','6.2','103.21.44.9','retail session','alert','low','Closed','Low-confidence suffix pattern; no bypass achieved.']
+].map(r=>({id:r[0],t:r[1],cls:r[2],atlas:r[3],model:r[4],surf:r[5],det:r[6],conf:r[7],q:r[8],ml:r[9],mv:r[10],ip:r[11],by:r[12],act:r[13],sev:r[14],status:r[15],note:r[16]}));
+const ADVCLS=[...new Set(ADV.map(a=>a.cls))];
+const ADVDEF=[['Input sanitisation & canonicalisation','All prompts and tool arguments normalised before inspection','on','61 of 61 routed agents'],['Perturbation & OOD screening','Feature and image inputs scored against the training distribution','on','14 scoring models'],['Query budget & rate shaping','Per-identity query budgets with burst detection','on','all inference endpoints'],['Response confidence masking','Raw confidence scores withheld from external callers','partial','9 of 14 models'],['Randomised smoothing','Noise-augmented inference for vision classifiers','off','not enabled'],['Output watermarking','Statistical watermark on generated text for leak tracing','partial','3 of 6 LLM deployments']];
+
+const POIS=[
+ ['POI-001','05 Oct 09:12','Training data · label flipping','txn-fraud-train-2026Q3','Label-consistency check',612,'1.8%',.94,'critical','quarantine','Open','partner merchant feed','AML.T0020','1.8% of labels flipped fraud → legitimate in the latest ingest shard, concentrated in one merchant category.'],
+ ['POI-002','05 Oct 08:40','RAG index poisoning','credit-policy-index','Content-integrity scan',3,'0.02%',.97,'high','quarantine','Open','SharePoint /Credit/Policies','AML.T0051','Hidden white-on-white instructions inside 3 policy PDFs telling the assistant to approve without further checks.'],
+ ['POI-003','05 Oct 07:55','Training data · clean-label backdoor','collections-calls-2026Q3','Spectral signature',188,'0.4%',.88,'high','quarantine','Investigating','call-centre export','AML.T0020','Spectral signature test isolated a cluster of correctly-labelled samples carrying a shared trigger phrase.'],
+ ['POI-004','04 Oct 22:10','Embedding store poisoning','customer-support-kb','Statistical outlier (Mahalanobis)',46,'0.1%',.83,'medium','alert','Investigating','ticket import','AML.T0020','Outlier embeddings clustered far from the corpus manifold.'],
+ ['POI-005','04 Oct 19:02','Model weights tampering','mistral-7b-instruct-v0.3','Provenance attestation',1,'—',.99,'critical','quarantine','Contained','Hugging Face mirror','AML.T0010','Registered hash does not match the vendor attestation; artifact quarantined before deploy.'],
+ ['POI-006','04 Oct 16:30','Fine-tune dataset poisoning','collections-ft-set-v4','Duplicate & near-duplicate scan',1240,'2.6%',.79,'medium','alert','Open','synthetic augmentation job','AML.T0020','Near-duplicate amplification of a narrow template, skewing the fine-tune distribution.'],
+ ['POI-007','04 Oct 13:18','Feedback loop poisoning (RLHF)','cx-support-feedback','Statistical outlier (Mahalanobis)',904,'3.1%',.86,'high','alert','Investigating','public chat widget','AML.T0020','Coordinated thumbs-up on unsafe responses from a small set of sessions.'],
+ ['POI-008','03 Oct 20:44','RAG index poisoning','customer-support-kb','Canary / backdoor probe',7,'0.03%',.91,'high','quarantine','Contained','uploaded attachments','AML.T0051','Canary probe recovered injected instructions from 7 indexed attachments.'],
+ ['POI-009','03 Oct 15:20','Training data · dirty-label backdoor','kyc-doc-train-v2','Activation clustering',96,'0.2%',.90,'high','quarantine','Open','vendor annotation batch','AML.T0020','Activation clustering separated a trigger-bearing subpopulation with inconsistent labels.'],
+ ['POI-010','03 Oct 11:05','Training data · label flipping','txn-fraud-train-2026Q3','Label-consistency check',211,'0.6%',.76,'medium','alert','Closed','annotator drift','AML.T0020','Label disagreement traced to annotator drift rather than an attack.'],
+ ['POI-011','02 Oct 18:40','Embedding store poisoning','vec-wealth-research','Statistical outlier (Mahalanobis)',23,'0.05%',.72,'low','alert','Closed','research scrape','AML.T0020','Low-confidence outliers; accepted after review.'],
+ ['POI-012','02 Oct 14:12','RAG index poisoning','hr-policy-index','Content-integrity scan',1,'0.01%',.84,'medium','quarantine','Contained','intranet page','AML.T0051','Injected instruction block inside an intranet policy page.'],
+ ['POI-013','01 Oct 09:30','Fine-tune dataset poisoning','sdr-outreach-ft','Spectral signature',58,'0.3%',.70,'low','alert','Closed','CRM export','AML.T0020','Weak spectral signal; no trigger confirmed.'],
+ ['POI-014','01 Oct 08:02','Model weights tampering','sentiment-bert-custom','Provenance attestation',1,'—',.98,'critical','quarantine','Contained','third-party checkpoint','AML.T0010','Unsigned checkpoint with an executable payload on load; quarantined.']
+].map(r=>({id:r[0],t:r[1],vec:r[2],target:r[3],det:r[4],n:r[5],pct:r[6],conf:r[7],sev:r[8],act:r[9],status:r[10],src:r[11],atlas:r[12],note:r[13]}));
+const POISVEC=[...new Set(POIS.map(p=>p.vec))];
+const PDS=[
+ ['txn-fraud-train-2026Q3','Training set','1.9B rows','1.8%','0.4%','no attestation','fail','94.1%','At risk'],
+ ['collections-calls-2026Q3','Training set','2.4M rows','0.4%','2.6%','attested','fail','96.8%','At risk'],
+ ['kyc-doc-train-v2','Training set','8.1M docs','0.2%','0.1%','attested','fail','97.2%','At risk'],
+ ['credit-policy-index','RAG index','412 docs','—','0.0%','attested','pass','99.1%','Quarantined'],
+ ['customer-support-kb','RAG index','18.4k docs','—','0.1%','attested','fail','95.4%','At risk'],
+ ['hr-policy-index','RAG index','1.2k docs','—','0.0%','attested','pass','99.6%','Healthy'],
+ ['vec-wealth-research','Embedding store','312k vectors','—','0.05%','no attestation','pass','98.8%','Healthy'],
+ ['collections-ft-set-v4','Fine-tune set','47k samples','0.1%','2.6%','attested','pass','97.9%','At risk'],
+ ['cx-support-feedback','Feedback set','29k ratings','3.1%','0.2%','attested','pass','96.1%','At risk'],
+ ['sdr-outreach-ft','Fine-tune set','12k samples','0.0%','0.3%','attested','pass','98.4%','Healthy']];
+const PGUARD=[['Provenance attestation on ingest','Every dataset shard must carry a signed provenance record','partial','7 of 9 datasets'],['Label-consistency scoring','Cross-annotator agreement checked on every batch','on','all training sets'],['Spectral signature & activation clustering','Backdoor screening before any fine-tune starts','on','all fine-tune jobs'],['Canary / backdoor probes','Known triggers replayed against each build','on','4 models'],['RAG content-integrity scan','Hidden text, instruction blocks and invisible characters','on','all indexed sources'],['Immutable ingest audit trail','Append-only record of every shard and transformation','partial','training sets only']];
+
+const GDET=[
+ ['Prompt injection (direct)','guardrail','input',61,4,412,'96.2%','1.2%','v3.8.2'],
+ ['Indirect injection (retrieval)','guardrail','retrieval',54,6,118,'93.4%','2.1%','v3.8.2'],
+ ['Jailbreak classifier','guardrail','input',61,3,133,'95.1%','1.8%','v3.8.2'],
+ ['Adversarial suffix (GCG)','adversarial','input',61,5,81,'91.0%','3.0%','v3.8.1'],
+ ['PII / SPDI DLP','dlp','input + output',61,7,318,'98.0%','0.6%','v3.8.2'],
+ ['Secrets detector','dlp','input',61,2,44,'97.3%','0.9%','v3.8.2'],
+ ['Toxicity','guardrail','output',48,3,27,'92.0%','2.4%','v3.8.2'],
+ ['Grounding / hallucination','guardrail','output',32,11,63,'84.2%','5.1%','v3.8.1'],
+ ['Query-pattern analysis','adversarial','rate · async',61,0,112,'89.4%','4.2%','v3.8.2'],
+ ['Perturbation norm detector','adversarial','input',14,9,36,'90.1%','3.3%','v3.8.1'],
+ ['Confidence-distribution anomaly','adversarial','output · async',9,0,28,'86.0%','5.8%','v3.8.1'],
+ ['Tool / metadata poisoning','guardrail','tool',16,4,9,'94.0%','1.1%','v3.8.2'],
+ ['RAG content integrity','poisoning','retrieval',11,8,14,'92.3%','2.2%','v3.8.2']
+].map(d=>({n:d[0],cls:d[1],stage:d[2],cov:d[3],p95:d[4],hits:d[5],tp:d[6],fp:d[7],ver:d[8]}));
+
+function openAdv(id){const a=ADV.find(x=>x.id===id);if(!a)return;
+ drawer(`${dhead('Adversarial attack · '+a.id,esc(a.cls))}
+ <div class="meta"><span class="act act-${a.act}">${a.act}</span>${pill(a.sev)}<span class="lbl">ATLAS</span><span style="color:var(--fg)">${a.atlas}</span><span class="lbl">Confidence</span><b class="num">${a.conf.toFixed(2)}</b>${chip(a.status,a.status==='Open'?'bad':a.status==='Investigating'?'warn':'ok')}</div>
+ <p style="margin:0">${esc(a.note)}</p>
+ ${panes([['Overview',`<dl class="kv"><dt>Attack class</dt><dd>${esc(a.cls)}</dd><dt>Target model</dt><dd class="mono">${esc(a.model)}</dd><dt>Surface</dt><dd>${a.surf}</dd><dt>Detector</dt><dd>${a.det}</dd><dt>Queries observed</dt><dd class="num">${fmt(a.q)}</dd><dt>${a.ml}</dt><dd class="mono">${a.mv}</dd><dt>Source</dt><dd class="mono">${a.ip}</dd><dt>Caller</dt><dd>${esc(a.by)}</dd><dt>MITRE ATLAS</dt><dd>${a.atlas}</dd><dt>Status</dt><dd>${chip(a.status,a.status==='Open'?'bad':a.status==='Investigating'?'warn':'ok')}</dd></dl>`],
+  ['Telemetry',`<div class="bars">${[['Detector confidence',Math.round(a.conf*100)],['Query volume vs baseline',Math.min(100,Math.round(a.q/220))],['Signal strength ('+a.ml+')',Math.min(100,60+Math.round(a.conf*35))]].map(b=>bar(b[0],b[1],100,b[1]+'',scoreCol(100-b[1]))).join('')}</div>
+   ${jbox('quilr.gateway.adversarial/v1',{id:a.id,time:'2026-10-05T'+a.t+':00+05:30',attack_class:a.cls,mitre_atlas:a.atlas,target_model:a.model,surface:a.surf,detector:a.det,confidence:a.conf,queries_observed:a.q,signal:{metric:a.ml,value:a.mv},source_ip:a.ip,caller:a.by,action:a.act,severity:a.sev,status:a.status.toLowerCase(),engine:'quilr-ai-gateway'})}`],
+  ['Response',`<div class="list">${[['Gateway action',a.act==='block'?'Requests blocked at the gateway and the caller rate-limited':'Allowed and logged; caller flagged for review'],['Rate shaping','Query budget tightened for this identity'],['Model owner notified',a.model+' owner paged via the on-call rotation'],['Ticket',a.sev==='critical'||a.sev==='high'?'SEC ticket opened and linked to this event':'No ticket — below threshold']].map(r=>`<div class="li"><div class="a"><div>${r[0]}</div><div class="sub" style="text-transform:none">${esc(r[1])}</div></div></div>`).join('')}</div>
+   <div class="btns"><button class="btn pri" data-toast="Query budget reduced for ${esc(a.by)}">Throttle caller</button><button class="btn" data-toast="Marked as false positive; detector feedback sent">False positive</button></div>`]])}`,true)}
+
+function openPois(id){const p=POIS.find(x=>x.id===id);if(!p)return;
+ drawer(`${dhead('Data poisoning · '+p.id,esc(p.vec))}
+ <div class="meta"><span class="act act-${p.act==='quarantine'?'block':'alert'}">${p.act}</span>${pill(p.sev)}<span class="lbl">ATLAS</span><span style="color:var(--fg)">${p.atlas}</span><span class="lbl">Confidence</span><b class="num">${p.conf.toFixed(2)}</b>${chip(p.status,p.status==='Open'?'bad':p.status==='Investigating'?'warn':'ok')}</div>
+ <p style="margin:0">${esc(p.note)}</p>
+ ${panes([['Overview',`<dl class="kv"><dt>Vector</dt><dd>${esc(p.vec)}</dd><dt>Target</dt><dd class="mono">${esc(p.target)}</dd><dt>Detector</dt><dd>${p.det}</dd><dt>Affected records</dt><dd class="num">${fmt(p.n)}</dd><dt>Share of corpus</dt><dd class="mono">${p.pct}</dd><dt>Confidence</dt><dd class="num">${p.conf.toFixed(2)}</dd><dt>Source</dt><dd>${esc(p.src)}</dd><dt>Detected</dt><dd class="mono">${p.t}</dd><dt>MITRE ATLAS</dt><dd>${p.atlas}</dd><dt>Status</dt><dd>${chip(p.status,p.status==='Open'?'bad':p.status==='Investigating'?'warn':'ok')}</dd></dl>`],
+  ['Detector output',jbox('quilr.pipeline.poisoning/v1',{id:p.id,detected_at:p.t,vector:p.vec,target:p.target,detector:p.det,affected_records:p.n,corpus_share:p.pct,confidence:p.conf,source:p.src,mitre_atlas:p.atlas,action:p.act,severity:p.sev,status:p.status.toLowerCase(),engine:'quilr-data-integrity'})],
+  ['Containment',`<div class="list">${[[p.act==='quarantine'?'Shard quarantined':'Flagged for review',p.act==='quarantine'?fmt(p.n)+' records held out of the next build':fmt(p.n)+' records flagged; build continues'],['Build gate','Training and fine-tune jobs on '+p.target+' blocked until cleared'],['Lineage traced','Source identified as '+p.src],['Re-scan scheduled','Full corpus re-scan queued after remediation']].map(r=>`<div class="li"><div class="a"><div>${r[0]}</div><div class="sub" style="text-transform:none">${esc(r[1])}</div></div></div>`).join('')}</div>
+   <div class="btns"><button class="btn pri" data-toast="${fmt(p.n)} records quarantined from ${esc(p.target)}">Quarantine records</button><button class="btn" data-toast="Re-scan queued for ${esc(p.target)}">Re-scan corpus</button></div>`]])}`,true)}
+
+function openPoisDs(name){const d=PDS.find(x=>x[0]===name);if(!d)return;const ev=POIS.filter(p=>p.target===name);
+ drawer(`${dhead('Data integrity · '+d[1],d[0])}
+ <div class="meta">${chip(d[8],d[8]==='Healthy'?'ok':d[8]==='Quarantined'?'bad':'warn')}<span class="lbl">Volume</span><span class="mono">${d[2]}</span><span class="lbl">Events</span><b class="num">${ev.length}</b></div>
+ ${panel('Integrity checks','Run on every ingest and before every training or indexing job.',tbl(['Check','Result','Detail'],[['Label drift',d[3]==='—'?'n/a':(parseFloat(d[3])>1?'Fail':'Pass'),d[3]==='—'?'not a labelled corpus':d[3]+' of labels changed since the last baseline'],['Duplicate / near-duplicate',parseFloat(d[4])>2?'Fail':'Pass',d[4]+' of records are near-duplicates'],['Provenance attestation',d[5]==='attested'?'Pass':'Fail',d[5]],['Spectral signature',d[6]==='pass'?'Pass':'Fail',d[6]==='pass'?'no backdoor cluster found':'suspicious cluster isolated'],['Canary / backdoor probe',parseFloat(d[7])>97?'Pass':'Fail',d[7]+' canary accuracy']].map(r=>`<tr><td>${r[0]}</td><td>${chip(r[1],r[1]==='Pass'?'ok':r[1]==='n/a'?'off':'bad')}</td><td class="muted">${esc(r[2])}</td></tr>`)))}
+ ${ev.length?panel('Poisoning events on this corpus','Select an event for its detector output.',tbl(['Detected','Vector','Detector','>Records','Severity','Status'],ev.map(p=>`<tr data-pois="${p.id}"><td class="mono nowrap">${p.t}</td><td>${esc(p.vec)}</td><td class="muted">${p.det}</td><td class="r num">${fmt(p.n)}</td><td>${pill(p.sev)}</td><td>${chip(p.status,p.status==='Open'?'bad':p.status==='Investigating'?'warn':'ok')}</td></tr>`))):''}`,true)}
+
+function openDetector(n){const d=GDET.find(x=>x.n===n);if(!d)return;
+ drawer(`${dhead('Gateway detector',d.n)}
+ <div class="meta"><span class="tag">${d.cls}</span><span class="tag">${d.stage}</span><span class="lbl">Version</span><span class="mono">${d.ver}</span><span class="lbl">Detections · 24h</span><b class="num">${fmt(d.hits)}</b></div>
+ ${panel('Telemetry',' ',`<dl class="kv"><dt>Detector class</dt><dd>${d.cls}</dd><dt>Inspection stage</dt><dd>${d.stage}</dd><dt>Assets covered</dt><dd class="num">${d.cov}</dd><dt>Added latency p95</dt><dd class="mono">${d.p95?d.p95+' ms':'asynchronous — no inline latency'}</dd><dt>Detections · 24h</dt><dd class="num">${fmt(d.hits)}</dd><dt>True-positive rate</dt><dd class="mono c-ok">${d.tp}</dd><dt>False-positive rate</dt><dd class="mono ${parseFloat(d.fp)>3?'c-med':''}">${d.fp}</dd><dt>Version</dt><dd class="mono">${d.ver}</dd></dl>`)}
+ ${jbox('quilr.gateway.detector/v1',{detector:d.n,class:d.cls,stage:d.stage,assets_covered:d.cov,p95_added_ms:d.p95,detections_24h:d.hits,true_positive_rate:d.tp,false_positive_rate:d.fp,version:d.ver,engine:'quilr-ai-gateway'})}`,true)}
+
+V.gwAdv=()=>{
+ const h=hrs(24),sevO={critical:0,high:1,medium:2,low:3};
+ const ext=[0,0,1,0,1,0,0,1,2,3,2,4,3,2,1,2,3,4,2,1,1,0,1,2],eva=[1,0,0,1,0,1,1,2,3,4,3,2,4,3,2,3,2,3,2,1,2,1,0,1],inf=[0,1,0,0,1,1,0,1,2,2,3,2,2,3,2,1,2,2,1,2,1,1,0,1];
+ const byCls=ADVCLS.map(c=>[c,ADV.filter(a=>a.cls===c).length]).sort((a,b)=>b[1]-a[1]);
+ const byModel=[...new Set(ADV.map(a=>a.model))].map(m=>[m,ADV.filter(a=>a.model===m).length]).sort((a,b)=>b[1]-a[1]);
+ return `${kpis([['Adversarial detections',ADV.length,'c-high','last 24 hours'],['Critical',ADV.filter(a=>a.sev==='critical').length,'c-crit'],['Blocked',ADV.filter(a=>a.act==='block').length,'c-high'],['Models targeted',byModel.length],['Open investigations',ADV.filter(a=>a.status==='Open'||a.status==='Investigating').length,'c-med'],['Mean confidence',(ADV.reduce((s,a)=>s+a.conf,0)/ADV.length).toFixed(2)]])}
+ <div class="grid g21">
+  ${panel('Adversarial activity per hour','Gateway detections by attack family, last 24 hours.',lineChart([{n:'Extraction / inversion',c:'var(--high)',v:ext},{n:'Evasion / perturbation',c:'var(--med)',v:eva},{n:'Inference attacks',c:'var(--violet)',v:inf}],h,{area:true,label:'adversarial activity per hour'}))}
+  ${panel('By attack class','Detections in the last 24 hours.',`<div class="bars">${byCls.map(c=>bar(c[0],c[1],byCls[0][1],c[1]+'','var(--high)')).join('')}</div>`)}
+ </div>
+ ${panel('Adversarial attack detections',`${ADV.length} detections against ${byModel.length} models. Select a detection for its telemetry, signal metrics and response.`,tbl(['Time','Attack class','Target model','Detector','>Conf.','Signal','>Queries','Source','Action','Status'],ADV.slice().sort((a,b)=>sevO[a.sev]-sevO[b.sev]).map(a=>`<tr data-adv="${a.id}"><td class="mono nowrap">${a.t}</td><td>${esc(a.cls)}<span class="s2">${a.id} · ${a.atlas}</span></td><td class="mono">${esc(a.model)}<span class="s2">${a.surf}</span></td><td class="muted">${a.det}</td><td class="r num">${a.conf.toFixed(2)}</td><td class="mono nowrap">${a.ml}<span class="s2">${a.mv}</span></td><td class="r num">${fmt(a.q)}</td><td class="mono nowrap">${a.ip}<span class="s2">${esc(a.by)}</span></td><td><span class="act act-${a.act}">${a.act}</span></td><td>${chip(a.status,a.status==='Open'?'bad':a.status==='Investigating'?'warn':'ok')}</td></tr>`)))}
+ <div class="grid g2">
+  ${panel('Most-targeted models','Adversarial detections per model in the last 24 hours.',`<div class="bars">${byModel.map(m=>bar(m[0],m[1],byModel[0][1],m[1]+'','var(--violet)')).join('')}</div>`)}
+  ${panel('Adversarial defences','Controls that raise the cost of these attacks.',tbl(['Control','Coverage','Status'],ADVDEF.map(d=>`<tr><td>${d[0]}<span class="s2">${esc(d[1])}</span></td><td class="muted">${esc(d[3])}</td><td>${chip(d[2],d[2]==='on'?'ok':d[2]==='partial'?'warn':'off')}</td></tr>`)))}
+ </div>`;
+};
+
+V.gwPoison=()=>{
+ const sevO={critical:0,high:1,medium:2,low:3};
+ const byVec=POISVEC.map(v=>[v,POIS.filter(p=>p.vec===v).length]).sort((a,b)=>b[1]-a[1]);
+ const byDet=[...new Set(POIS.map(p=>p.det))].map(d=>[d,POIS.filter(p=>p.det===d).length]).sort((a,b)=>b[1]-a[1]);
+ const corp=[...new Set(POIS.map(p=>p.target))].length;
+ return `${kpis([['Poisoning detections',POIS.length,'c-high','last 7 days'],['Critical',POIS.filter(p=>p.sev==='critical').length,'c-crit'],['Quarantined',POIS.filter(p=>p.act==='quarantine').length,'c-high'],['Targets affected',corp],['Records held out',fmt(POIS.filter(p=>p.act==='quarantine').reduce((s,p)=>s+p.n,0)),'c-med'],['Open',POIS.filter(p=>p.status==='Open'||p.status==='Investigating').length,'c-med']])}
+ <div class="grid g2">
+  ${panel('By poisoning vector','Where the poisoning was introduced.',`<div class="bars">${byVec.map(v=>bar(v[0],v[1],byVec[0][1],v[1]+'','var(--high)')).join('')}</div>`)}
+  ${panel('By detection method','Which integrity test caught it.',`<div class="bars">${byDet.map(d=>bar(d[0],d[1],byDet[0][1],d[1]+'','var(--blue)')).join('')}</div>`)}
+ </div>
+ ${panel('Data poisoning detections',`${POIS.length} detections across ${corp} targets — training sets, indexes, embedding stores and model weights. Select a detection for the detector output and containment.`,tbl(['Detected','Vector','Target corpus','Detector','>Records','Share','>Conf.','ATLAS','Severity','Action','Status'],POIS.slice().sort((a,b)=>sevO[a.sev]-sevO[b.sev]).map(p=>`<tr data-pois="${p.id}"><td class="mono nowrap">${p.t}</td><td>${esc(p.vec)}<span class="s2">${p.id} · from ${esc(p.src)}</span></td><td class="mono">${esc(p.target)}</td><td class="muted">${p.det}</td><td class="r num">${fmt(p.n)}</td><td class="r mono">${p.pct}</td><td class="r num">${p.conf.toFixed(2)}</td><td class="mono">${p.atlas}</td><td>${pill(p.sev)}</td><td><span class="act act-${p.act==='quarantine'?'block':'alert'}">${p.act}</span></td><td>${chip(p.status,p.status==='Open'?'bad':p.status==='Investigating'?'warn':'ok')}</td></tr>`)))}
+ ${panel('Data integrity checks by corpus','Label drift, duplication, provenance, spectral signature and canary accuracy for every corpus that feeds a model. Select a corpus for its checks and events.',tbl(['Corpus','Kind','Volume','>Label drift','>Duplicates','Provenance','Spectral','>Canary acc.','Status'],PDS.map(d=>`<tr data-poisds="${esc(d[0])}"><td class="mono">${d[0]}</td><td class="muted">${d[1]}</td><td class="mono nowrap">${d[2]}</td><td class="r mono ${d[3]!=='—'&&parseFloat(d[3])>1?'c-crit':''}">${d[3]}</td><td class="r mono ${parseFloat(d[4])>2?'c-med':''}">${d[4]}</td><td>${chip(d[5]==='attested'?'attested':'none',d[5]==='attested'?'ok':'warn')}</td><td>${chip(d[6],d[6]==='pass'?'ok':'bad')}</td><td class="r mono ${parseFloat(d[7])<97?'c-med':''}">${d[7]}</td><td>${chip(d[8],d[8]==='Healthy'?'ok':d[8]==='Quarantined'?'bad':'warn')}</td></tr>`)))}
+ ${panel('Training-pipeline integrity guardrails','Controls that run before any model is trained, fine-tuned or indexed.',tbl(['Guardrail','Scope','Status'],PGUARD.map(g=>`<tr><td>${g[0]}<span class="s2">${esc(g[1])}</span></td><td class="muted">${esc(g[3])}</td><td>${chip(g[2],g[2]==='on'?'ok':g[2]==='partial'?'warn':'off')}</td></tr>`)))}`;
+};
+
 /* ---------------- render & events ---------------- */
 function render(){
  const v=VIEWS.find(x=>x.k===state.view)||VIEWS[0];
@@ -2852,7 +2989,7 @@ function render(){
  const on=$('#tabs .tab.on');if(on)on.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function go(k){state.view=k;try{history.replaceState(null,'','#'+k)}catch(e){}closeDrawer();render();window.scrollTo(0,0)}
-const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
+const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-adv],[data-pois],[data-poisds],[data-det],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
 document.addEventListener('click',e=>{
  const t=e.target.closest(SPEC);
  if(t){const d=t.dataset;
@@ -2895,6 +3032,10 @@ document.addEventListener('click',e=>{
   if(d.ptpack){const pk=PTPL.find(x=>x[1]===d.ptpack);let n=0;pk[2].forEach(t=>{if(t[2]&&POL.some(p=>p.id===t[2]))return;const w=pwDefault(tplPrefill(t).type,tplPrefill(t));const id='QP-'+(Math.max(...POL.map(p=>parseInt(p.id.slice(3))||0))+1);POL.push({id,n:t[0],cat:t[1],act:w.act,mode:'Monitor',sev:w.sev,fw:[pk[0]],rule:pwRule(w),desc:'Installed from the '+pk[0]+' template pack. Review matches before switching to Enforce.',owner:'you',upd:'05 Oct 2026',ver:1,hits:0});t[2]=id;n++});
    PAUD.unshift(['05 Oct '+new Date().toTimeString().slice(0,5),'you',pk[0],'Installed '+n+(n===1?' template':' templates')+' in Monitor mode']);render();DST.pop();openTemplates();toast(n+(n===1?' policy':' policies')+' added from '+pk[0]+' in Monitor mode');return}
   if(d.pwfrom){const p=POL.find(x=>x.id===d.pwfrom);openWizard({type:p.cat==='gov'?'runtime':p.cat,name:p.n+' (copy)',act:p.act,sev:p.sev});return}
+  if(d.adv){openAdv(d.adv);return}
+  if(d.pois){openPois(d.pois);return}
+  if(d.poisds){openPoisDs(d.poisds);return}
+  if(d.det){openDetector(d.det);return}
   if(d.pplat){openPPlat(d.pplat);return}
   if(d.pbench){openPBench(d.pbench);return}
   if(d.pchk){openPChk(d.pchk);return}
