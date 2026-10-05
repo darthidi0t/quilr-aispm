@@ -352,6 +352,18 @@ pre.json .k{color:#86a8ff} pre.json .s{color:#7fd8a8} pre.json .n{color:var(--me
 .ctl{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
 .ctl:first-child{border-top:0}.ctl b{font-weight:500;font-size:12.5px}.ctl .s2{display:block;font-size:11px;color:var(--dim)}
 .ctl .seg{flex-wrap:nowrap;flex:none}.ctl .seg button{padding:3px 8px;font-size:11px}
+/* platform posture cards */
+.pfgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(224px,1fr));gap:10px}
+.pfc{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px 13px;display:flex;flex-direction:column;gap:9px;cursor:pointer;text-align:left;color:inherit;font:inherit}
+.pfc:hover{border-color:var(--accent-line);background:var(--hover)}
+.pfc .ph2{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pfc .pn{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;min-width:0}
+.pfc .pscore{font-family:var(--mono);font-size:15px;font-weight:600;flex:none}
+.pfc .sbar{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--line)}
+.pfc .sbar i{display:block;height:100%}
+.pfc .pmeta{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pfc .pmeta b{color:var(--fg);font-weight:600}
+.hrow.on .n{color:var(--accent)}
 /* policy wizard */
 .pwsteps{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 .pwtype{display:flex;flex-direction:column;gap:3px;text-align:left;background:var(--panel);border:1px solid var(--line-2);border-radius:6px;padding:10px 12px;color:inherit;font:inherit;cursor:pointer}
@@ -770,20 +782,6 @@ function bomTree(){
  return `<div class="tree">${L.map(r=>`<div><span class="br">${r[2]?'&nbsp;&nbsp;'.repeat((r[2]-1)*2)+'└─ ':''}</span>${esc(r[0])}<span class="ty">${r[1]}</span></div>`).join('')}</div><div class="btns"><button class="btn" data-toast="CycloneDX 1.6 AI-BOM prepared for Loan Underwriting Copilot">Export CycloneDX</button></div>`;
 }
 
-V.posture=()=>{
- const plat=[['Azure OpenAI',4,11,19,6],['AWS Bedrock',0,7,14,5],['Copilot Studio',0,6,22,9],['Vertex AI',1,5,11,4],['SageMaker',0,4,9,3],['Databricks',0,3,12,5]];
- const mx=Math.max(...plat.map(p=>p[1]+p[2]+p[3]+p[4]));
- const fails=[['Public network access enabled','Azure OpenAI','aoai-prod-eus2','critical','Set publicNetworkAccess = Disabled; add private endpoint'],['Customer-managed key not configured','Azure OpenAI','aoai-credit-cin','high','Enable CMK with Key Vault key rotation 90d'],['Model invocation logging disabled','AWS Bedrock','acct 4127… ap-south-1','high','Enable invocation logging to S3 + CloudWatch'],['Agent published without authentication','Copilot Studio','Jira Assistant','high','Require Entra ID sign-in for the channel'],['Endpoint uses default service account','Vertex AI','wealth-advisor-ep','critical','Bind a dedicated SA with roles/aiplatform.user only'],['Notebook instance has root access','SageMaker','collections-ds-nb','medium','Set RootAccess = Disabled'],['Guardrail not attached to agent','AWS Bedrock','KYC Document Extractor','medium','Attach guardrail kyc-gr-v2 to agent alias']];
- const recs=[['Disable public network access on 3 Azure OpenAI resources','Clears 9 findings · −6 estate score'],['Move Wealth Advisor Bot endpoint to asia-south1','Clears residency + 4 findings'],['Enforce Copilot Studio DLP policy “Bank-Confidential” on all environments','Clears 22 findings'],['Turn on Bedrock invocation logging in 2 accounts','Unblocks traceability for 14 agents'],['Rotate 22 API keys older than 90 days','Clears 22 identity findings']];
- return `${kpis([['Checks evaluated','1,862','','every 15 minutes'],['Passing','84%','c-ok','+3 pts this week'],['Failed','296',''],['Critical misconfig','5','c-crit'],['Platforms','9'],['Auto-remediable','61','c-blue','one-click fix available']])}
- <div class="grid g21">
-  ${panel('Misconfigurations by platform','Failed checks, stacked by severity.',`<div class="legend">${['critical','high','medium','low'].map(s=>`<span><i style="background:${sevCol[s]}"></i>${s}</span>`).join('')}</div><div class="bars">${plat.map(p=>`<div class="hrow"><span class="n">${p[0]}</span><div class="track stack" style="background:transparent">${[1,2,3,4].map((j,ji)=>`<div class="fill" style="width:${p[j]/mx*100}%;background:${sevCol[['critical','high','medium','low'][ji]]}"></div>`).join('')}</div><span class="v">${p[1]+p[2]+p[3]+p[4]}</span></div>`).join('')}</div>`)}
-  ${panel('Benchmarks','Continuous compliance against policies and standards.',`<div class="bars">${[['Quilr AI Security Baseline',86],['Azure OpenAI security baseline',78],['AWS Bedrock best practices',83],['Copilot Studio governance',71],['Bank AI Acceptable Use Policy',90]].map(b=>bar(b[0],b[1],100,b[1]+'% pass',scoreCol(b[1]))).join('')}</div>`)}
- </div>
- ${panel('Failed checks','Highest severity first.',tbl(['Check','Platform','Resource','Severity','Remediation',''],fails.map(f=>`<tr><td>${f[0]}</td><td class="nowrap">${srcDot(f[1])} ${f[1]}</td><td class="mono">${f[2]}</td><td>${pill(f[3])}</td><td class="muted">${f[4]}</td><td><button class="btn" data-toast="Remediation drafted for ${esc(f[2])}">Fix</button></td></tr>`)))}
- ${panel('Hardening recommendations','Ranked by risk reduction per change.',`<div class="list">${recs.map((r,i)=>`<div class="li"><div class="a"><div>${r[0]}</div><div class="sub" style="text-transform:none">${r[1]}</div></div><button class="btn ${i===0?'pri':''}" data-toast="Change request created">Create change</button></div>`).join('')}</div>`)}`;
-};
-
 /* ---------------- Model security (augmented) ---------------- */
 const MODELS=[
  ['m1','credit-pd-xgb-v12','Databricks','XGBoost · tabular','prod','model-risk','Probability-of-default scoring for retail credit',0.07,'Verified','Clean',true,'—','Pass',['LLM10'],3,'Sigstore'],
@@ -887,7 +885,7 @@ const ABPAT_LLM=['Prompt-injection attempt blocked','PII in prompt redacted','Ja
 const ABPAT_OTH=['Out-of-distribution input','Anomalous query volume','Feature drift on scoring request','Repeated identical scoring calls','Unusual caller for this model','Spike in low-confidence predictions'];
 const ABBY=['svc-mktg-automation','branch-user · Pune-04','dev-sandbox-17','retail customer session','customer chat · web','svc-collections','analyst-07','sa-wealth-advisor','partner-api','branch-user · Mumbai-11','ops-kyc','svc-fraud-batch'];
 const ABDAY=['05 Oct','04 Oct','03 Oct','02 Oct','01 Oct','30 Sep','29 Sep'];
-const MAB=[];(function(){const H=x=>{let h=2166136261;for(let i=0;i<x.length;i++){h^=x.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};let id=1;MODELS.forEach((m,mi)=>{const isLLM=m.type.includes('LLM');const pats=isLLM?ABPAT_LLM:ABPAT_OTH;for(let i=0;i<m.abuse;i++){const h=H(m.id+'ab'+i),dayOff=h%7,hh=6+((h>>3)%15),mm=(h>>6)%60;const pat=pats[(h>>2)%pats.length],by=ABBY[(h>>5)%ABBY.length];const act=isLLM?['alert','block','redact','hold','alert','block','alert'][(h>>7)%7]:['alert','alert','block','alert','alert'][(h>>7)%5];MAB.push({id:'AB-'+String(id++).padStart(4,'0'),model:m.n,mi,t:ABDAY[dayOff]+' '+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'),tms:(6-dayOff)*86400+hh*3600+mm*60,p:pat,by,act});}});MAB.sort((a,b)=>b.tms-a.tms);})();
+const MAB=[];(function(){const H=x=>{let h=2166136261;for(let i=0;i<x.length;i++){h^=x.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};let id=1;MODELS.forEach((m,mi)=>{const isLLM=m.type.includes('LLM');const pats=isLLM?ABPAT_LLM:ABPAT_OTH;for(let i=0;i<m.abuse;i++){const h=H(m.id+'ab'+i),dayOff=h%7,hh=6+((h>>>3)%15),mm=(h>>>6)%60;const pat=pats[(h>>>2)%pats.length],by=ABBY[(h>>>5)%ABBY.length];const act=isLLM?['alert','block','redact','hold','alert','block','alert'][(h>>>7)%7]:['alert','alert','block','alert','alert'][(h>>>7)%5];MAB.push({id:'AB-'+String(id++).padStart(4,'0'),model:m.n,mi,t:ABDAY[dayOff]+' '+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'),tms:(6-dayOff)*86400+hh*3600+mm*60,p:pat,by,act});}});MAB.sort((a,b)=>b.tms-a.tms);})();
 const ABUSE=MAB;
 function openAbuseLog(id){const a=MAB.find(x=>x.id===id);if(!a)return;const m=MODELS.find(x=>x.n===a.model);const pol=a.act==='block'?(/[Jj]ailbreak|injection/.test(a.p)?'QP-07':'QP-01'):a.act==='redact'?'QP-02':a.act==='hold'?'QP-03':'QP-15';
  drawer(`${dhead('Abuse event · '+a.id,esc(a.p))}
@@ -2555,8 +2553,8 @@ const CGEN=[];(function(){const H=x=>{let h=2166136261;for(let i=0;i<x.length;i+
  Object.entries(CTARGET).forEach(([cat,[tot,critT]])=>{const cur=CFIND.filter(f=>f.cat===cat),curCrit=cur.filter(f=>f.sev==='critical').length;
   const gN=tot-cur.length,gCrit=Math.max(0,critT-curCrit),gHigh=Math.round((gN-gCrit)*0.22),gMed=Math.round((gN-gCrit-gHigh)*0.62),gLow=gN-gCrit-gHigh-gMed;
   const sevs=[].concat(Array(gCrit).fill('critical'),Array(gHigh).fill('high'),Array(gMed).fill('medium'),Array(Math.max(0,gLow)).fill('low'));
-  for(let i=0;i<gN;i++){const h=H(cat+'cg'+i),a=CACC[h%CACC.length],sev=sevs[i]||'low',rule=CRULES[cat][h%CRULES[cat].length],pfx=CRES[cat][(h>>3)%CRES[cat].length];
-   const res=pfx+(cat==='stor'?['research','analytics','backups','exports','ml-data'][(h>>5)%5]+'-'+(h%900+100):cat==='iam'?['deploy','data','svc','app','ops'][(h>>5)%5]+'-'+(h%90+10):(h>>7).toString(16).slice(0,8));
+  for(let i=0;i<gN;i++){const h=H(cat+'cg'+i),a=CACC[h%CACC.length],sev=sevs[i]||'low',rule=CRULES[cat][h%CRULES[cat].length],pfx=CRES[cat][(h>>>3)%CRES[cat].length];
+   const res=pfx+(cat==='stor'?['research','analytics','backups','exports','ml-data'][(h>>>5)%5]+'-'+(h%900+100):cat==='iam'?['deploy','data','svc','app','ops'][(h>>>5)%5]+'-'+(h%90+10):(h>>>7).toString(16).slice(0,8));
    CGEN.push({id:'CG-'+String(seq++).padStart(4,'0'),cat,sev,cloud:a.cloud,acct:a.name,res,rule,bench:CBENCH[a.cloud],ai:false,
     desc:rule+' on '+res+' in '+a.name+'. Detected by the Quilr Cloud Posture scanner against the '+a.cloud+' baseline.',
     fix:'Apply the '+catName(cat).toLowerCase()+' hardening control and re-scan to confirm.',
@@ -2572,7 +2570,7 @@ const EXPB=[['wealth-advisor-lb','GCP · us-west1','allow-ingress-443-all','443'
 const EXP=[];(function(){const H=x=>{let h=2166136261;for(let i=0;i<x.length;i++){h^=x.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};
  EXPB.forEach((e,i)=>EXP.push({id:'EX-'+String(i+1).padStart(3,'0'),res:e[0],cloud:e[1],rule:e[2],port:e[3],ip:e[4],asset:e[5],ai:e[6]}));
  const clouds=['AWS · ap-south-1','Azure · eastus2','GCP · us-west1','AWS · us-east-1','Azure · centralindia'],rules=['Security group 0.0.0.0/0','Public load balancer','NACL allow all','Open management port','Public API endpoint'],aiassets=['collections endpoint','content-gen app','fraud scoring API','embedding service','test harness'];
- for(let i=0;i<26;i++){const h=H('exp'+i),ai=i<4;EXP.push({id:'EX-'+String(i+6).padStart(3,'0'),res:(ai?'ai-':'svc-')+(h>>4).toString(16).slice(0,7),cloud:clouds[h%clouds.length],rule:rules[(h>>3)%rules.length],port:['443','22','3389','8080','5432'][(h>>5)%5],ip:(h%223+1)+'.'+(h>>4)%256+'.'+(h>>8)%256+'.'+(h>>12)%256,asset:ai?aiassets[(h>>6)%aiassets.length]:'—',ai});}
+ for(let i=0;i<26;i++){const h=H('exp'+i),ai=i<4;EXP.push({id:'EX-'+String(i+6).padStart(3,'0'),res:(ai?'ai-':'svc-')+(h>>>4).toString(16).slice(0,7),cloud:clouds[h%clouds.length],rule:rules[(h>>>3)%rules.length],port:['443','22','3389','8080','5432'][(h>>>5)%5],ip:(h%223+1)+'.'+(h>>>4)%256+'.'+(h>>>8)%256+'.'+(h>>>12)%256,asset:ai?aiassets[(h>>>6)%aiassets.length]:'—',ai});}
 })();
 function openExp(id){const e=EXP.find(x=>x.id===id);if(!e)return;
  drawer(`${dhead('Internet exposure · '+e.id,e.res)}
@@ -2627,7 +2625,7 @@ const SURF=[
  {k:'training',name:'Training datasets',n:2650,pats:['Card PAN (PCI DSS)','Aadhaar number','Bank account number'],desc:'Sensitive records inside datasets used to train or fine-tune models.'},
  {k:'agentlogs',name:'Agent logs',n:1430,pats:['Mobile / email','Credentials & keys'],desc:'Sensitive data captured in agent traces, tool-call logs and transcripts.'}];
 const SURFBY=['Loan Underwriting Copilot','KYC Document Extractor','Wealth Advisor Bot','SDR Outreach Agent','customer-support-kb','gpt-4o-prod-eus2','collections fine-tune','fraud-model-v7'];
-function surfDetections(s){const out=[];for(let i=0;i<8;i++){const h=num(s.k+'d'+i);out.push({id:s.k.toUpperCase().slice(0,3)+'-'+String(i+1).padStart(3,'0'),pat:s.pats[h%s.pats.length],asset:SURFBY[(h>>3)%SURFBY.length],t:['05 Oct 11:'+(10+h%49),'05 Oct 10:'+(10+(h>>2)%49),'04 Oct 17:'+(10+(h>>4)%49)][h%3],n:1+h%640,act:['redact','block','alert','redact'][(h>>5)%4]});}return out;}
+function surfDetections(s){const out=[];for(let i=0;i<8;i++){const h=num(s.k+'d'+i);out.push({id:s.k.toUpperCase().slice(0,3)+'-'+String(i+1).padStart(3,'0'),pat:s.pats[h%s.pats.length],asset:SURFBY[(h>>>3)%SURFBY.length],t:['05 Oct 11:'+(10+h%49),'05 Oct 10:'+(10+(h>>>2)%49),'04 Oct 17:'+(10+(h>>>4)%49)][h%3],n:1+h%640,act:['redact','block','alert','redact'][(h>>>5)%4]});}return out;}
 const EXMASK={'Aadhaar number':'XXXX XXXX 9264','PAN':'XXXXX4821X','Bank account number':'XXXXXX7731','Card PAN (PCI DSS)':'XXXX XXXX XXXX 4821','Mobile / email':'+91 98XXXXXX10','Health / insurance data':'[redacted]','Credentials & keys':'AKIA••••••7Q'};
 
 const EXFIL=[
@@ -2724,6 +2722,122 @@ DSV.residency=()=>`${secH('Data residency & localisation','Customer and payment 
  ${kpis([['Assets in scope',RESID.length],['Compliant',RESID.filter(r=>r.st==='Compliant').length,'c-ok'],['Under review',RESID.filter(r=>r.st==='Review').length,'c-med'],['Violations',RESID.filter(r=>r.st==='Violation').length,'c-crit']])}
  ${panel('Residency status','Required vs actual processing region for each AI asset holding regulated data.',tbl(['Asset','Data class','Required','Actual','Status'],RESID.map(r=>`<tr data-resid="${r.id}"><td>${esc(r.asset)}</td><td>${esc(r.cls)}</td><td class="mono">${r.req}</td><td class="mono ${r.st==='Violation'?'c-crit':''}">${r.actual}</td><td>${chip(r.st,r.st==='Compliant'?'ok':r.st==='Review'?'warn':'bad')}</td></tr>`)))}`;
 
+/* ---------------- AI Posture (augmented) ---------------- */
+const PPLAT=[
+ {k:'aoai',n:'Azure OpenAI',res:14,ev:312,fail:58,crit:2},
+ {k:'cps',n:'Copilot Studio',res:23,ev:268,fail:49,crit:1},
+ {k:'bed',n:'AWS Bedrock',res:11,ev:241,fail:38,crit:0},
+ {k:'vtx',n:'Vertex AI',res:9,ev:206,fail:31,crit:1},
+ {k:'sage',n:'SageMaker',res:12,ev:188,fail:27,crit:1},
+ {k:'dbx',n:'Databricks',res:8,ev:184,fail:29,crit:0},
+ {k:'hf',n:'Hugging Face',res:7,ev:162,fail:24,crit:0},
+ {k:'sfdc',n:'Salesforce Agentforce',res:6,ev:158,fail:22,crit:0},
+ {k:'eks',n:'Self-hosted (EKS)',res:14,ev:143,fail:18,crit:0}];
+const PCAT2=[['Network & access','net'],['Identity & permissions','idm'],['Encryption & keys','enc'],['Logging & monitoring','log'],['Guardrails & safety','guard'],['Data handling','data'],['Model lifecycle','life'],['Agent configuration','agent']];
+const pcatName=k=>(PCAT2.find(c=>c[1]===k)||['—'])[0];
+const PTITLES={net:['Private endpoint not configured','Endpoint reachable from 0.0.0.0/0','TLS 1.2 not enforced','Egress to internet unrestricted','Service firewall allows all networks'],
+ idm:['Default service account in use','Over-permissive role binding','API key authentication enabled','MFA not enforced for admins','Managed identity not assigned'],
+ enc:['Key rotation disabled','Data at rest uses platform key','Secrets stored outside the vault','Double encryption not enabled'],
+ log:['Diagnostic settings not configured','Audit log retention under 90 days','Prompt logging not exported to SIEM','Resource logs disabled'],
+ guard:['Content filter set to low','Prompt-injection shield disabled','Jailbreak detection off','No output moderation on agent','Guardrail version out of date'],
+ data:['Training data not classified','Customer data outside approved region','No DLP policy on environment','Grounding source not access-filtered'],
+ life:['Model version not pinned','Deprecated model version in use','No approval gate before deploy','Model card missing'],
+ agent:['Agent has no owner recorded','Tool allow-list not configured','Human approval not required for write tools','Session timeout not set','Agent shares a shared identity']};
+const PRES={aoai:['aoai-prod-eus2','aoai-credit-cin','aoai-shared-weu','deploy/gpt-4o-','rg-ai-platform/'],cps:['Jira Assistant','HR Policy Q&A','CX Support Bot','env/Default-nwf','env/Prod-nwf'],bed:['kyc-agent-alias','bedrock-gr-','acct 4127… ap-south-1','claude-sonnet-4-'],vtx:['wealth-advisor-ep','reasoningEngine/5517','vtx-index-','nwf-wealth-prod-31'],sage:['collections-ds-nb','collections-ep','sm-research-exec','model-pkg-'],dbx:['fraud-ml-cluster','mlflow-reg/','dbx-job-','unity-catalog/'],hf:['nwf-research/hub','spaces/demo-','model/mistral-','token/hf-'],sfdc:['SDR_Outreach','Agentforce/prompt-','einstein-trust-','conn/sfdc-'],eks:['github-mcp-server','postgres-mcp-server','ns/mcp-prod','svc/mcp-gw-']};
+const POWN=['ai-platform','cloud-platform','secops','model-risk','app-eng','data-platform'];
+const PCURATED=[
+ ['Public network access enabled','aoai','net','aoai-prod-eus2','critical','gpt-4o-prod-eus2','Set publicNetworkAccess = Disabled and add a private endpoint.','az cognitiveservices account update -n aoai-prod-eus2 -g rg-ai-platform --api-properties publicNetworkAccess=Disabled'],
+ ['Customer-managed key not configured','aoai','enc','aoai-credit-cin','high','Loan Underwriting Copilot','Enable a customer-managed key with 90-day rotation in Key Vault.','az cognitiveservices account update -n aoai-credit-cin -g rg-credit-ai --encryption KeyVault'],
+ ['Model invocation logging disabled','bed','log','acct 4127… ap-south-1','high','KYC Document Extractor','Enable Bedrock invocation logging to S3 and CloudWatch.','aws bedrock put-model-invocation-logging-configuration --logging-config cloudWatchConfig={logGroupName=/bedrock/invocations}'],
+ ['Guardrail not attached to agent','bed','guard','KYC Document Extractor','medium','KYC Document Extractor','Attach guardrail kyc-gr-v2 to the agent alias.','aws bedrock-agent update-agent-alias --agent-id KYCX7Q2L9P --guardrail-identifier kyc-gr-v2'],
+ ['Agent published without authentication','cps','agent','Jira Assistant','high','Jira Assistant','Require Entra ID sign-in on the web channel.','Copilot Studio → Settings → Security → Authentication = Entra ID'],
+ ['Endpoint uses default service account','vtx','idm','wealth-advisor-ep','critical','Wealth Advisor Bot','Bind a dedicated service account with roles/aiplatform.user only.','gcloud ai endpoints update wealth-advisor-ep --service-account=sa-wealth-advisor@nwf-wealth-prod-31.iam.gserviceaccount.com'],
+ ['Notebook instance has root access','sage','idm','collections-ds-nb','medium','collections fine-tune','Set RootAccess = Disabled on the notebook instance.','aws sagemaker update-notebook-instance --notebook-instance-name collections-ds-nb --root-access Disabled']];
+const PCHK=[];(function(){const H=x=>{let h=2166136261;for(let i=0;i<x.length;i++){h^=x.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};let seq=1;
+ const mk=o=>{PCHK.push(Object.assign({id:'AP-'+String(seq++).padStart(4,'0')},o))};
+ PCURATED.forEach(c=>{const h=H(c[0]+c[1]);mk({t:c[0],pk:c[1],cat:c[2],res:c[3],sev:c[4],ai:c[5],fix:c[6],cli:c[7],age:1+h%60,own:POWN[h%POWN.length],auto:h%5===0,status:'Open',ctrl:'QAB-'+(1+h%9)+'.'+(1+(h>>>3)%9),featured:true})});
+ PPLAT.forEach(p=>{const cur=PCHK.filter(c=>c.pk===p.k),gN=p.fail-cur.length,gCrit=Math.max(0,p.crit-cur.filter(c=>c.sev==='critical').length);
+  const gHigh=Math.round((gN-gCrit)*0.24),gMed=Math.round((gN-gCrit-gHigh)*0.6),gLow=gN-gCrit-gHigh-gMed;
+  const sevs=[].concat(Array(gCrit).fill('critical'),Array(gHigh).fill('high'),Array(gMed).fill('medium'),Array(Math.max(0,gLow)).fill('low'));
+  for(let i=0;i<gN;i++){const h=H(p.k+'ap'+i),cat=PCAT2[(h>>>2)%PCAT2.length][1],pool=PTITLES[cat],t=pool[h%pool.length],rp=PRES[p.k];
+   const res=rp[(h>>>4)%rp.length]+((h>>>9)%97);
+   const st=(h>>>11)%12===0?'Accepted risk':(h>>>11)%4===0?'In progress':'Open';
+   mk({t,pk:p.k,cat,res,sev:sevs[i]||'low',ai:(h>>>6)%3===0?'—':['Loan Underwriting Copilot','KYC Document Extractor','Wealth Advisor Bot','gpt-4o-prod-eus2','SDR Outreach Agent','collections LLM endpoint'][(h>>>7)%6],
+    fix:'Apply the '+pcatName(cat).toLowerCase()+' baseline control and re-evaluate on the next scan.',
+    cli:'quilr posture remediate --check AP-'+String(seq).padStart(4,'0')+' --resource '+res,
+    age:1+h%90,own:POWN[(h>>>5)%POWN.length],auto:(h>>>8)%5===0,status:st,ctrl:'QAB-'+(1+h%9)+'.'+(1+(h>>>3)%9),featured:false});}
+ });})();
+const pPlatOf=k=>PPLAT.find(p=>p.k===k)||{n:k};
+const PEVAL=PPLAT.reduce((s,p)=>s+p.ev,0);
+const pSev=(arr,s)=>arr.filter(c=>c.sev===s).length;
+const PBENCH=[
+ ['qab','Quilr AI Security Baseline','v2.1','All 9 AI platforms · 104 resources',148,127,'05 Oct 09:10','ai-platform',3],
+ ['aup','Bank AI Acceptable Use Policy','v3.0','Workforce & customer-facing AI',38,34,'04 Oct 19:30','ciso-office',0],
+ ['bed','AWS Bedrock best practices','v2.0','11 Bedrock agents & models',54,45,'05 Oct 08:25','cloud-platform',1],
+ ['iso','ISO/IEC 42001 AI controls','2023','AI management system',58,47,'03 Oct 16:00','model-risk',2],
+ ['owasp','OWASP LLM Top 10 config controls','2025','Runtime & platform configuration',40,31,'05 Oct 07:50','secops',3],
+ ['aoai','Azure OpenAI security baseline','v1.4','14 Azure OpenAI resources',62,48,'05 Oct 08:40','cloud-platform',2],
+ ['vtx','Vertex AI security baseline','v1.1','9 Vertex AI resources',44,33,'05 Oct 08:55','cloud-platform',4],
+ ['nist','NIST AI RMF','1.0','GOVERN · MAP · MEASURE · MANAGE',72,54,'03 Oct 15:20','model-risk',1],
+ ['cps','Copilot Studio governance','v1.2','23 agents · 4 environments',46,33,'04 Oct 22:05','app-eng',-1]
+].map(b=>({k:b[0],n:b[1],ver:b[2],scope:b[3],tot:b[4],pass:b[5],last:b[6],own:b[7],trend:b[8],pct:Math.round(b[5]/b[4]*100)}));
+const bStatus=p=>p>=85?['Certified','ok']:p>=75?['In progress','warn']:['At risk','bad'];
+function benchControls(b){const H=x=>{let h=2166136261;for(let i=0;i<x.length;i++){h^=x.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};
+ const out=[],failN=b.tot-b.pass,show=Math.min(b.tot,18);
+ for(let i=0;i<show;i++){const h=H(b.k+'c'+i),fail=i<Math.min(failN,8),cat=PCAT2[h%PCAT2.length];
+  out.push({id:b.k.toUpperCase()+'-'+(1+Math.floor(i/3))+'.'+(1+i%3),t:PTITLES[cat[1]][h%PTITLES[cat[1]].length],cat:cat[0],res:fail?1+h%9:0,sev:fail?['critical','high','medium','low'][h%4]:'low',ok:!fail});}
+ return out;}
+
+function openPPlat(k){const p=pPlatOf(k),cs=PCHK.filter(c=>c.pk===k),sevO={critical:0,high:1,medium:2,low:3};
+ const pass=p.ev-p.fail,pct=Math.round(pass/p.ev*100);
+ drawer(`${dhead('AI platform posture',p.n)}
+ <div class="meta">${srcDot(p.n)}<span class="lbl">Pass rate</span><b class="num" style="color:${scoreCol(pct)}">${pct}%</b><span class="lbl">Failed</span><b class="num">${p.fail}</b>${p.crit?pill('critical'):chip('no critical','ok')}</div>
+ ${panes([['Overview',`<dl class="kv"><dt>Resources in scope</dt><dd class="num">${p.res}</dd><dt>Checks evaluated</dt><dd class="num">${fmt(p.ev)}</dd><dt>Passing</dt><dd class="num">${fmt(pass)}</dd><dt>Failed</dt><dd class="num">${p.fail}</dd><dt>Critical</dt><dd class="num ${p.crit?'c-crit':''}">${p.crit}</dd><dt>Auto-remediable</dt><dd class="num">${cs.filter(c=>c.auto).length}</dd><dt>Accepted risk</dt><dd class="num">${cs.filter(c=>c.status==='Accepted risk').length}</dd></dl>
+  <div class="bars" style="margin-top:10px">${['critical','high','medium','low'].map(s=>bar(s,pSev(cs,s),p.fail,pSev(cs,s)+'',sevCol[s])).join('')}</div>`],
+  [`Failed checks (${p.fail})`,tbl(['Severity','Check','Resource','Category','>Age'],cs.sort((a,b)=>sevO[a.sev]-sevO[b.sev]).slice(0,40).map(c=>`<tr data-pchk="${c.id}"><td>${pill(c.sev)}</td><td>${esc(c.t)}</td><td class="mono">${esc(c.res)}</td><td class="muted">${pcatName(c.cat)}</td><td class="r num">${c.age}d</td></tr>`))+(p.fail>40?`<p class="dim" style="font-size:11.5px;margin:8px 0 0">Showing 40 of ${p.fail}.</p>`:'')],
+  ['By category',`<div class="bars">${PCAT2.map(c=>{const n=cs.filter(x=>x.cat===c[1]).length;return n?bar(c[0],n,p.fail,n+''):''}).join('')}</div>`]])}`,true)}
+
+function openPBench(k){const b=PBENCH.find(x=>x.k===k);if(!b)return;const cs=benchControls(b),st=bStatus(b.pct);
+ drawer(`${dhead('Benchmark · '+b.ver,b.n)}
+ <div class="meta">${chip(st[0],st[1])}<span class="lbl">Pass rate</span><b class="num" style="color:${scoreCol(b.pct)}">${b.pct}%</b><span class="lbl">Controls</span><b class="num">${b.pass} / ${b.tot}</b><span class="lbl">Trend</span><span class="${b.trend>0?'c-ok':b.trend<0?'c-high':'dim'}">${b.trend>0?'+':''}${b.trend} pts</span></div>
+ ${panes([['Overview',`<dl class="kv"><dt>Benchmark</dt><dd>${b.n}</dd><dt>Version</dt><dd class="mono">${b.ver}</dd><dt>Scope</dt><dd>${esc(b.scope)}</dd><dt>Controls passed</dt><dd class="num">${b.pass} of ${b.tot}</dd><dt>Controls failed</dt><dd class="num c-high">${b.tot-b.pass}</dd><dt>Last assessed</dt><dd class="mono">${b.last}</dd><dt>Owner</dt><dd class="mono">${b.own}</dd><dt>Status</dt><dd>${chip(st[0],st[1])}</dd></dl><div class="btns"><button class="btn pri" data-toast="${b.n} report exported as PDF">Export report</button><button class="btn" data-toast="Re-assessment queued for ${b.n}">Re-assess</button></div>`],
+  ['Controls',tbl(['Control','Title','Category','Result','>Resources','Severity'],cs.map(c=>`<tr><td class="mono">${c.id}</td><td>${esc(c.t)}</td><td class="muted">${c.cat}</td><td>${chip(c.ok?'Pass':'Fail',c.ok?'ok':'bad')}</td><td class="r num">${c.res||'<span class="dim">—</span>'}</td><td>${c.ok?'<span class="dim">—</span>':pill(c.sev)}</td></tr>`))+`<p class="dim" style="font-size:11.5px;margin:8px 0 0">Showing ${cs.length} of ${b.tot} controls.</p>`],
+  ['Evidence',jbox('quilr.posture.benchmark/v1',{benchmark:b.n,version:b.ver,scope:b.scope,controls_total:b.tot,controls_passed:b.pass,pass_rate:b.pct+'%',last_assessed:b.last,owner:b.own,trend_pts:b.trend,status:st[0],assessor:'quilr-posture-engine'})]])}`,true)}
+
+function openPChk(id){const c=PCHK.find(x=>x.id===id);if(!c)return;const p=pPlatOf(c.pk);
+ drawer(`${dhead('Posture check · '+c.id,esc(c.t))}
+ <div class="meta">${pill(c.sev)}<span class="tag">${pcatName(c.cat)}</span><span class="tag">${c.ctrl}</span>${chip(c.status,c.status==='Open'?'bad':c.status==='In progress'?'warn':'off')}${c.auto?chip('auto-remediable','ok'):''}</div>
+ <p style="margin:0">${esc(c.t)} on <span class="mono">${esc(c.res)}</span> (${p.n}). First seen ${c.age} days ago.</p>
+ ${panes([['Overview',`<dl class="kv"><dt>Check ID</dt><dd class="mono">${c.id}</dd><dt>Platform</dt><dd>${srcDot(p.n)} ${p.n}</dd><dt>Resource</dt><dd class="mono">${esc(c.res)}</dd><dt>AI asset affected</dt><dd>${esc(c.ai)}</dd><dt>Category</dt><dd>${pcatName(c.cat)}</dd><dt>Control</dt><dd class="mono">${c.ctrl}</dd><dt>Severity</dt><dd>${pill(c.sev)}</dd><dt>First seen</dt><dd>${c.age} days ago</dd><dt>Owner</dt><dd class="mono">${c.own}</dd><dt>Status</dt><dd>${chip(c.status,c.status==='Open'?'bad':c.status==='In progress'?'warn':'off')}</dd></dl>`],
+  ['Remediation',`<p style="margin:0 0 10px">${esc(c.fix)}</p>${jbox('Suggested fix',c.cli)}<div class="btns">${c.auto?'<button class="btn pri" data-toast="Auto-remediation queued for '+c.id+'">Auto-remediate</button>':''}<button class="btn" data-toast="Change request created for ${c.id}">Create change</button><button class="btn" data-toast="Exception requires model-risk approval">Accept risk</button></div>`],
+  ['Evidence',jbox('quilr.posture.check/v1',{id:c.id,check:c.t,platform:p.n,resource:c.res,ai_asset:c.ai==='—'?null:c.ai,category:c.cat,control:c.ctrl,severity:c.sev,status:c.status.toLowerCase(),auto_remediable:c.auto,first_seen_days:c.age,owner:c.own,evaluated_every:'15m',engine:'quilr-posture-engine'})],
+  ['History',tbl(['When','Event','By'],[[c.age+'d ago','Check first failed','quilr-posture-engine'],[Math.max(1,c.age-2)+'d ago','Assigned to '+c.own,'secops'],[c.status==='In progress'?'2d ago':'1d ago',c.status==='In progress'?'Remediation started':'Re-evaluated · still failing','quilr-posture-engine'],['today','Last evaluation','quilr-posture-engine']].map(r=>`<tr><td class="mono nowrap">${r[0]}</td><td>${r[1]}</td><td class="mono">${r[2]}</td></tr>`))]])}`,true)}
+
+V.posture=()=>{
+ const f=state.pof||(state.pof={sev:'All',plat:'All',cat:'All'}),N=state.poN||40,sevO={critical:0,high:1,medium:2,low:3};
+ const rows=PCHK.filter(c=>(f.sev==='All'||c.sev===f.sev)&&(f.plat==='All'||c.pk===f.plat)&&(f.cat==='All'||c.cat===f.cat)).sort((a,b)=>(b.featured-a.featured)||sevO[a.sev]-sevO[b.sev]||b.age-a.age);
+ const pass=PEVAL-PCHK.length,auto=PCHK.filter(c=>c.auto).length,acc=PCHK.filter(c=>c.status==='Accepted risk').length;
+ const recs=[['Disable public network access on 3 Azure OpenAI resources','Clears 9 findings · +6 posture score'],['Move the Wealth Advisor Bot endpoint to asia-south1','Clears residency plus 4 findings'],['Enforce the Copilot Studio DLP policy “Bank-Confidential” on all environments','Clears 22 findings'],['Turn on Bedrock invocation logging in 2 accounts','Unblocks traceability for 14 agents'],['Attach guardrails to 6 agents missing them','Clears 6 guardrail findings']];
+ return `${kpis([['Checks evaluated',fmt(PEVAL),'','every 15 minutes'],['Passing',Math.round(pass/PEVAL*100)+'%','c-ok','+3 pts this week'],['Failed',PCHK.length,''],['Critical misconfig',pSev(PCHK,'critical'),'c-crit'],['Platforms',PPLAT.length],['Auto-remediable',auto,'c-blue','one-click fix available']])}
+ <div class="grid g21">
+  ${panel('Posture score trend','Share of checks passing across all AI platforms, last 30 days.',lineChart([{n:'Passing %',c:'var(--accent)',v:[78,78,79,78,80,80,79,81,80,81,82,81,82,83,82,82,83,83,82,84,83,84,84,83,84,85,84,84,85,84]}],days(30),{max:100,label:'posture trend',fmt:v=>Math.round(v)+'%'}))}
+  ${panel('Failed checks by category','Select a category to filter the table below.',`<div class="bars">${PCAT2.map(c=>{const n=PCHK.filter(x=>x.cat===c[1]).length;return `<div class="hrow clickable ${f.cat===c[1]?'on':''}" data-pof="cat|${c[1]}"><span class="n">${c[0]}</span><div class="track"><div class="fill" style="width:${n/Math.max(...PCAT2.map(y=>PCHK.filter(x=>x.cat===y[1]).length))*100}%"></div></div><span class="v">${n}</span></div>`}).join('')}</div>`)}
+ </div>
+ ${panel('Misconfigurations by platform',`${PCHK.length} failed checks across ${PPLAT.length} AI platforms. Select a platform for its detail.`,`<div class="pfgrid">${PPLAT.slice().sort((a,b)=>b.fail-a.fail).map(p=>{const cs=PCHK.filter(c=>c.pk===p.k),pct=Math.round((p.ev-p.fail)/p.ev*100);
+  return `<button class="pfc" data-pplat="${p.k}"><div class="ph2"><span class="pn">${srcDot(p.n)} ${p.n}</span><span class="pscore" style="color:${scoreCol(pct)}">${pct}%</span></div>
+  <div class="sbar">${['critical','high','medium','low'].map(s=>{const n=pSev(cs,s);return n?`<i style="width:${n/p.fail*100}%;background:${sevCol[s]}" title="${n} ${s}"></i>`:''}).join('')}</div>
+  <div class="pmeta"><span><b>${p.fail}</b> failed</span><span><b>${p.res}</b> resources</span><span><b>${fmt(p.ev)}</b> checks</span></div>
+  <div class="pmeta"><span>${p.crit?`<span class="c-crit">${p.crit} critical</span>`:'<span class="dim">no critical</span>'}</span><span>${cs.filter(c=>c.auto).length} auto-fix</span></div></button>`}).join('')}</div>`)}
+ ${panel('Benchmarks','Continuous compliance against platform baselines, standards and your own policy. Select a benchmark for its control-level report.',tbl(['Benchmark','Version','Scope','>Controls','Pass rate','Last assessed','Owner','>Trend','Status'],PBENCH.slice().sort((a,b)=>b.pct-a.pct).map(b=>{const st=bStatus(b.pct);return `<tr data-pbench="${b.k}"><td>${esc(b.n)}</td><td class="mono">${b.ver}</td><td class="muted">${esc(b.scope)}</td><td class="r num">${b.pass} / ${b.tot}</td><td style="min-width:120px"><div class="track" style="height:6px"><div class="fill" style="width:${b.pct}%;background:${scoreCol(b.pct)}"></div></div><span class="s2" style="color:${scoreCol(b.pct)}">${b.pct}%</span></td><td class="mono nowrap">${b.last}</td><td class="mono">${b.own}</td><td class="r num ${b.trend>0?'c-ok':b.trend<0?'c-high':'dim'}">${b.trend>0?'+':''}${b.trend}</td><td>${chip(st[0],st[1])}</td></tr>`})))}
+ ${panel('Failed checks',`${rows.length} of ${PCHK.length} failed checks. Select a check for remediation, evidence and history.`,`<div class="meta"><span class="lbl">Severity</span>${['critical','high','medium','low'].map(s=>`<button class="chipbtn ${f.sev===s?'on':''}" data-pof="sev|${s}">${s} <b>${pSev(PCHK,s)}</b></button>`).join('')}<span class="lbl">Platform</span>${PPLAT.map(p=>`<button class="chipbtn ${f.plat===p.k?'on':''}" data-pof="plat|${p.k}">${p.n} <b>${p.fail}</b></button>`).join('')}${(f.sev!=='All'||f.plat!=='All'||f.cat!=='All')?'<button class="btn" data-pof="reset|1">Reset</button>':''}</div>
+  ${tbl(['Severity','ID','Check','Platform','Resource','Control','>Age','Owner','Status'],rows.slice(0,N).map(c=>`<tr data-pchk="${c.id}"><td>${pill(c.sev)}</td><td class="mono">${c.id}</td><td>${esc(c.t)}<span class="s2">${pcatName(c.cat)}${c.auto?' · auto-fix':''}</span></td><td class="nowrap">${srcDot(pPlatOf(c.pk).n)} ${pPlatOf(c.pk).n}</td><td class="mono">${esc(c.res)}<span class="s2">${c.ai==='—'?'':esc(c.ai)}</span></td><td class="mono nowrap">${c.ctrl}</td><td class="r num">${c.age}d</td><td class="mono">${c.own}</td><td>${chip(c.status,c.status==='Open'?'bad':c.status==='In progress'?'warn':'off')}</td></tr>`))}
+  ${rows.length>N?`<div class="btns"><button class="btn" data-pomore="1">Show all ${rows.length}</button></div>`:''}`)}
+ <div class="grid g2">
+  ${panel('Hardening recommendations','Ranked by risk reduction per change.',`<div class="list">${recs.map((r,i)=>`<div class="li"><div class="a"><div>${r[0]}</div><div class="sub" style="text-transform:none">${r[1]}</div></div><button class="btn ${i===0?'pri':''}" data-toast="Change request created">Create change</button></div>`).join('')}</div>`)}
+  ${panel('Accepted risks & exceptions',`${acc} checks accepted with an owner and review date.`,tbl(['Check','Platform','Severity','Owner','>Age'],PCHK.filter(c=>c.status==='Accepted risk').slice(0,8).map(c=>`<tr data-pchk="${c.id}"><td>${esc(c.t)}</td><td class="nowrap">${pPlatOf(c.pk).n}</td><td>${pill(c.sev)}</td><td class="mono">${c.own}</td><td class="r num">${c.age}d</td></tr>`)))}
+ </div>`;
+};
+
 /* ---------------- render & events ---------------- */
 function render(){
  const v=VIEWS.find(x=>x.k===state.view)||VIEWS[0];
@@ -2738,7 +2852,7 @@ function render(){
  const on=$('#tabs .tab.on');if(on)on.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function go(k){state.view=k;try{history.replaceState(null,'','#'+k)}catch(e){}closeDrawer();render();window.scrollTo(0,0)}
-const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
+const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
 document.addEventListener('click',e=>{
  const t=e.target.closest(SPEC);
  if(t){const d=t.dataset;
@@ -2781,6 +2895,11 @@ document.addEventListener('click',e=>{
   if(d.ptpack){const pk=PTPL.find(x=>x[1]===d.ptpack);let n=0;pk[2].forEach(t=>{if(t[2]&&POL.some(p=>p.id===t[2]))return;const w=pwDefault(tplPrefill(t).type,tplPrefill(t));const id='QP-'+(Math.max(...POL.map(p=>parseInt(p.id.slice(3))||0))+1);POL.push({id,n:t[0],cat:t[1],act:w.act,mode:'Monitor',sev:w.sev,fw:[pk[0]],rule:pwRule(w),desc:'Installed from the '+pk[0]+' template pack. Review matches before switching to Enforce.',owner:'you',upd:'05 Oct 2026',ver:1,hits:0});t[2]=id;n++});
    PAUD.unshift(['05 Oct '+new Date().toTimeString().slice(0,5),'you',pk[0],'Installed '+n+(n===1?' template':' templates')+' in Monitor mode']);render();DST.pop();openTemplates();toast(n+(n===1?' policy':' policies')+' added from '+pk[0]+' in Monitor mode');return}
   if(d.pwfrom){const p=POL.find(x=>x.id===d.pwfrom);openWizard({type:p.cat==='gov'?'runtime':p.cat,name:p.n+' (copy)',act:p.act,sev:p.sev});return}
+  if(d.pplat){openPPlat(d.pplat);return}
+  if(d.pbench){openPBench(d.pbench);return}
+  if(d.pchk){openPChk(d.pchk);return}
+  if(d.pof){const [k,v]=d.pof.split('|');if(k==='reset')state.pof={sev:'All',plat:'All',cat:'All'};else state.pof[k]=state.pof[k]===v?'All':v;state.poN=40;render();return}
+  if(d.pomore){state.poN=99999;render();return}
   if(d.msec){openModelSec(d.msec);return}
   if(d.scan){openScan(d.scan);return}
   if(d.owasp){openOwasp(d.owasp);return}
