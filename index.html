@@ -2021,7 +2021,7 @@ state.ds={page:'overview',f:DSF0(),n:50,ik:null,rOff:{}};
 const CLOUDS=['AWS','Azure','GCP','Microsoft 365','Databricks','Salesforce'];
 const CLC={AWS:'#d9822b',Azure:'#2f6fd6',GCP:'#3b82f6','Microsoft 365':'#7c5cd6',Databricks:'#d4483b',Salesforce:'#1798c1'};
 const cdot=c=>`<span class="srcdot" style="background:${CLC[c]}">${c[0]}</span>`;
-const DSNAV=[['Overview','overview'],['Assets inventory',null,[['All assets','all'],['Databases','databases'],['Storage buckets','buckets'],['Backups','backups'],['Disks','disks'],['AI datasets','aidata'],['SaaS stores','saas']]],['Objects inventory',null,[['Files','files'],['Tables','tables'],['Fields','fields']]],['Data pattern inventory','patterns'],['Data security issues',null,[['Threats','threats'],['Posture','posture']]],['AI data protection',null,[['Overview','dpover'],['Data surfaces','surfaces'],['AI exfiltration','exfil'],['Protection integrations','protint'],['Residency','residency']]],['Detection rules','rules'],['Data classification',null,[['Data patterns','clspat'],['Data profiles','clsprof'],['Settings','clsset']]]];
+const DSNAV=[['Overview','overview'],['Assets inventory',null,[['All assets','all'],['Databases','databases'],['Storage buckets','buckets'],['Backups','backups'],['Disks','disks'],['AI datasets','aidata'],['SaaS stores','saas']]],['Objects inventory',null,[['Files','files'],['Tables','tables'],['Fields','fields']]],['Data pattern inventory','patterns'],['Data security issues',null,[['Threats','threats'],['Posture','posture'],['Sensitive exposure','exposure']]],['AI data protection',null,[['Overview','dpover'],['Data surfaces','surfaces'],['AI exfiltration','exfil'],['Protection integrations','protint'],['Residency','residency']]],['Detection rules','rules'],['Data classification',null,[['Data patterns','clspat'],['Data profiles','clsprof'],['Settings','clsset']]]];
 
 function dsRows(){const f=state.ds.f,q=f.q.toLowerCase(),cat=DCAT[state.ds.page];
  return DS.filter(d=>(!cat||d.cat===cat)&&(f.svc==='All'||d.svc===f.svc)&&(f.cloud==='All'||d.cloud===f.cloud)&&(f.prof==='All'||d.prof.includes(f.prof))&&(f.exp==='All'||(f.exp==='Open to world'?d.f.open:f.exp==='Shared externally'?d.f.ext:f.exp==='Public objects'?d.f.pubobj:f.exp==='Outside India'?d.f.foreign:f.exp==='Feeds AI'?d.ai.length>0:true))&&(f.region==='All'||(RGRP[d.region]?RGRP[d.region][0]:(REGXY[d.region]||[])[2])===f.region)&&(f.pat==='All'||d.pats.includes(+f.pat))&&(f.risk==='All'||(f.risk==='At risk'?d.atRisk:f.risk==='Sensitive'?d.sensitive:!d.sensitive))&&(!q||(d.name+' '+d.svc+' '+d.acct+' '+d.pats.map(p=>DPAT[p][0]).join(' ')).toLowerCase().includes(q))).sort((a,b)=>b.risk-a.risk||b.records-a.records)}
@@ -2049,7 +2049,7 @@ const REGXY={'ap-south-1':[72.8,19,'Mumbai'],'ap-south-2':[78.5,17.4,'Hyderabad'
 
 V.dspm=()=>{
  const pg=state.ds.page;
- const nav=`<nav class="subnav" aria-label="Data Posture sections">${DSNAV.map(([l,k,ch])=>ch?`<div class="sng">${l}</div>${ch.map(([cl,ck])=>`<button class="snb sub ${pg===ck?'on':''}" data-dsp="${ck}">${cl}<span>${ck in DCAT?fmt(ck==='all'?DS.length:DS.filter(d=>d.cat===DCAT[ck]).length):ck==='threats'?DTHR.length:ck==='posture'?DSI.length:ck==='exfil'?EXFIL.length:ck==='surfaces'?SURF.length:ck==='residency'?RESID.filter(r=>r.st==='Violation').length:ck==='protint'?PROTINT.filter(p=>p.st==='ok').length:''}</span></button>`).join('')}`:`<button class="snb ${pg===k?'on':''}" data-dsp="${k}">${l}</button>`).join('')}</nav>`;
+ const nav=`<nav class="subnav" aria-label="Data Posture sections">${DSNAV.map(([l,k,ch])=>ch?`<div class="sng">${l}</div>${ch.map(([cl,ck])=>`<button class="snb sub ${pg===ck?'on':''}" data-dsp="${ck}">${cl}<span>${ck in DCAT?fmt(ck==='all'?DS.length:DS.filter(d=>d.cat===DCAT[ck]).length):ck==='threats'?DTHR.length:ck==='posture'?DSI.length:ck==='exposure'?EXPOSED.length:ck==='exfil'?EXFIL.length:ck==='surfaces'?SURF.length:ck==='residency'?RESID.filter(r=>r.st==='Violation').length:ck==='protint'?PROTINT.filter(p=>p.st==='ok').length:''}</span></button>`).join('')}`:`<button class="snb ${pg===k?'on':''}" data-dsp="${k}">${l}</button>`).join('')}</nav>`;
  return `<div class="dsp">${nav}<div class="dsmain">${(DSV[pg in DCAT&&pg!=='all'?'all':pg]||DSV.overview)()}</div></div>`;
 };
 const DSV={};
@@ -2975,6 +2975,78 @@ V.gwPoison=()=>{
  ${panel('Training-pipeline integrity guardrails','Controls that run before any model is trained, fine-tuned or indexed.',tbl(['Guardrail','Scope','Status'],PGUARD.map(g=>`<tr><td>${g[0]}<span class="s2">${esc(g[1])}</span></td><td class="muted">${esc(g[3])}</td><td>${chip(g[2],g[2]==='on'?'ok':g[2]==='partial'?'warn':'off')}</td></tr>`)))}`;
 };
 
+/* ---------------- Sensitive data exposure + lineage to AI inventory (Data Posture) ---------------- */
+const EXPK=[
+ ['open','Open to world','var(--crit)','critical','The bucket, share or table policy grants read access to anyone on the internet.'],
+ ['ext','Shared externally','var(--violet)','high','Shared with a principal or account outside the organisation.'],
+ ['foreign','Outside India','var(--high)','high','Sensitive data processed or stored outside an approved Indian region (DPDP / RBI localisation).'],
+ ['pubobj','Public objects','var(--med)','medium','Individual objects are public inside an otherwise private store.'],
+ ['unenc','Weak or no encryption','var(--med)','medium','No customer-managed key, or encryption at rest is not enforced.']];
+const expTypes=d=>EXPK.filter(k=>d.f[k[0]]);
+const EXPOSED=DS.filter(d=>d.sensitive&&expTypes(d).length);
+const EXPAI=EXPOSED.filter(d=>d.ai&&d.ai.length);
+const sevRank={critical:0,high:1,medium:2,low:3};
+const expSev=d=>expTypes(d).map(k=>k[3]).sort((a,b)=>sevRank[a]-sevRank[b])[0]||'low';
+const expLabel=l=>({'open':'Open to world','ext':'Shared externally','foreign':'Outside India','pubobj':'Public objects','unenc':'Weak or no encryption'})[l];
+const aiOf=n=>ASSETS.find(a=>a.name===n);
+const PROCOF=d=>({'AI Dataset':'training / fine-tune job','Database':'feature pipeline','Storage Bucket':'ingest & index job','SaaS store':'connector sync','Backup':'restore job','Disk':'volume mount'})[d.cat]||'data pipeline';
+const chanOf=a=>!a?'Inference API':a.type==='Agent'?'User & customer channels':a.type==='MCP server'?'Agent tool calls':'Inference API';
+
+function expLineage(d){
+ const nodes=[{id:'s0',col:0,k:d.cat==='AI Dataset'?'dataset':d.cat==='Database'?'source':'storage',l:d.name,m:d.svc+' · '+d.cloud+' '+d.region,dsa:d.id,st:'bad'}];
+ nodes.push({id:'p0',col:1,k:'pipeline',l:PROCOF(d),m:d.region});
+ const cons=(d.ai||[]).slice(0,5);
+ if(!cons.length)nodes.push({id:'c0',col:2,k:'finding',l:'No AI consumer',m:'exposed but not feeding AI'});
+ cons.forEach((c,i)=>{const a=aiOf(c);nodes.push({id:'c'+i,col:2,k:a&&a.type==='Agent'?'agent':a&&a.type==='MCP server'?'tool':'model',l:c,m:a?a.src:'',asset:a&&a.id,st:a&&a.score>=60?'warn':''})});
+ const chans=[...new Set(cons.map(c=>chanOf(aiOf(c))))];
+ chans.forEach((c,i)=>nodes.push({id:'o'+i,col:3,k:'channel',l:c,m:''}));
+ const edges=[['s0','p0',d.pats.length+' patterns',true]];
+ cons.forEach((c,i)=>edges.push(['p0','c'+i,i===0?d.prof[0]||'sensitive':'',true]));
+ cons.forEach((c,i)=>edges.push(['c'+i,'o'+chans.indexOf(chanOf(aiOf(c))),'']));
+ return {nodes,edges};
+}
+
+function openExposure(id){const d=dsBy(id);if(!d)return;const ex=expTypes(d),L=expLineage(d),cons=(d.ai||[]).map(aiOf).filter(Boolean);
+ const hops=[[d.name,d.svc+' · '+d.cloud+' '+d.region,'Sensitive store',ex.map(k=>k[1]).join(', ')],
+  [PROCOF(d),d.region,'Processing',cons.length?'Moves '+d.prof.slice(0,2).join(', ')+' into AI':'No downstream AI consumer'],
+  ...cons.slice(0,5).map(a=>[a.name,a.src+' · '+a.region,a.type,'Consumes this data · risk '+a.score]),
+  ...(cons.length?[[chanOf(cons[0]),'—','Channel','Where the data can surface to people']]:[])];
+ drawer(`${dhead('Sensitive data exposure',esc(d.name))}
+ <div class="meta">${pill(expSev(d))}${ex.map(k=>`<span class="tag" style="border-color:${k[2]};color:${k[2]}">${k[1]}</span>`).join('')}<span class="lbl">Risk</span><b class="num" style="color:${scoreCol(100-d.risk)}">${d.risk}</b><span class="lbl">AI consumers</span><b class="num ${cons.length?'c-crit':''}">${cons.length}</b></div>
+ ${panes([['Overview',`<dl class="kv"><dt>Data store</dt><dd class="mono">${esc(d.name)}</dd><dt>Service</dt><dd>${d.svc} · ${d.cat}</dd><dt>Cloud · region</dt><dd>${cdot(d.cloud)} ${d.cloud} · <span class="mono">${d.region}</span></dd><dt>Account</dt><dd class="mono">${esc(d.acct)}</dd><dt>Data profiles</dt><dd>${d.prof.map(pchip).join('')||'—'}</dd><dt>Data patterns</dt><dd>${d.pats.slice(0,6).map(p=>`<span class="tag">${DPAT[p][0]}</span>`).join('')}</dd><dt>Volume</dt><dd class="mono">${d.records?fmtN(d.records)+' records':fmtN(d.objects)+' objects'}</dd><dt>First discovered</dt><dd class="mono">${d.first}</dd><dt>Last classified</dt><dd class="mono">${d.lastcls}</dd></dl>
+  ${panel('Why this is exposed',' ',`<div class="list">${ex.map(k=>`<div class="li"><div class="a"><div><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${k[2]};margin-right:6px"></i>${k[1]}</div><div class="sub" style="text-transform:none">${esc(k[4])}</div></div>${pill(k[3])}</div>`).join('')}</div>`)}`],
+  ['Lineage',`<p class="muted" style="margin:0 0 10px">Red dashed edges carry sensitive data out of the exposed store. Select an AI node to open its inventory record, or the store to open its data record.</p>
+   ${pgraph('explin'+d.id,L.nodes,L.edges,{head:['Exposed data store','Processing','AI consumer','Channel'],cw:258,nw:196,label:'exposure lineage'})}
+   ${tbl(['Hop','Where','Kind','What it means'],hops.map(h=>`<tr><td>${esc(h[0])}</td><td class="mono nowrap">${esc(h[1])}</td><td class="muted">${esc(h[2])}</td><td class="muted">${esc(h[3])}</td></tr>`))}`],
+  [`AI consumers (${cons.length})`,cons.length?tbl(['Asset','Type','Source','Env','Owner','Status','>Risk'],cons.map(a=>`<tr data-asset="${a.id}"><td>${esc(a.name)}</td><td>${a.type}</td><td class="nowrap">${srcDot(a.src)} ${a.src}</td><td>${a.env}</td><td class="mono">${a.owner}</td><td>${chip(a.status,ST[a.status]||'warn')}</td><td class="r num" style="color:${scoreCol(100-a.score)}">${a.score}</td></tr>`)):'<p class="muted">This store is exposed but no AI asset consumes it. It is still reachable, so it stays in scope for remediation.</p>'],
+  ['Evidence',jbox('quilr.dspm.exposure/v1',{data_asset:d.id,name:d.name,service:d.svc,cloud:d.cloud,region:d.region,account:d.acct,classification:d.prof,exposure:ex.map(k=>k[0]),severity:expSev(d),risk_score:d.risk,sensitive_patterns:d.pats.map(p=>DPAT[p][0]),ai_consumers:cons.map(a=>({id:a.id,name:a.name,type:a.type,source:a.src})),channel:cons.length?chanOf(cons[0]):null,detector:'quilr-dspm-exposure'})]])}
+ <div class="btns"><button class="btn pri" data-toast="Remediation ticket opened for ${esc(d.name)}">Create ticket</button><button class="btn" data-dsa="${d.id}">Open data record</button></div>`,true)}
+
+DSV.exposure=()=>{
+ const N=state.ds.n||50;
+ const rows=EXPOSED.slice().sort((a,b)=>(b.ai.length>0)-(a.ai.length>0)||sevRank[expSev(a)]-sevRank[expSev(b)]||b.risk-a.risk);
+ const byK=EXPK.map(k=>[k,DS.filter(d=>d.sensitive&&d.f[k[0]]).length]);
+ const consumers={};EXPAI.forEach(d=>d.ai.forEach(n=>{consumers[n]=consumers[n]||{n,stores:0,pats:new Set()};consumers[n].stores++;d.pats.forEach(p=>consumers[n].pats.add(p))}));
+ const cons=Object.values(consumers).sort((a,b)=>b.stores-a.stores);
+ const top=EXPAI.slice().sort((a,b)=>b.risk-a.risk).slice(0,5);
+ const gn=[],ge=[];
+ top.forEach((d,i)=>{gn.push({id:'s'+i,col:0,k:d.cat==='AI Dataset'?'dataset':d.cat==='Database'?'source':'storage',l:d.name,m:expTypes(d).map(k=>k[1])[0],dsa:d.id,st:'bad'})});
+ const allCons=[...new Set(top.flatMap(d=>d.ai))].slice(0,6);
+ allCons.forEach((c,i)=>{const a=aiOf(c);gn.push({id:'c'+i,col:1,k:a&&a.type==='Agent'?'agent':a&&a.type==='MCP server'?'tool':'model',l:c,m:a?a.src:'',asset:a&&a.id})});
+ const chans=[...new Set(allCons.map(c=>chanOf(aiOf(c))))];
+ chans.forEach((c,i)=>gn.push({id:'o'+i,col:2,k:'channel',l:c,m:''}));
+ top.forEach((d,i)=>d.ai.filter(c=>allCons.includes(c)).forEach(c=>ge.push(['s'+i,'c'+allCons.indexOf(c),d.prof[0]||'sensitive',true])));
+ allCons.forEach((c,i)=>ge.push(['c'+i,'o'+chans.indexOf(chanOf(aiOf(c))),'']));
+ return `${secH('Sensitive data exposure','Sensitive stores that are reachable beyond their intended boundary, and the lineage from each one into the AI assets that consume it. Select a store for its full lineage and AI consumers.')}
+ ${kpis([['Sensitive stores',fmt(DS.filter(d=>d.sensitive).length),'','classified Restricted or Confidential'],['Exposed',EXPOSED.length,'c-high','reachable beyond their boundary'],['Reaching AI',EXPAI.length,'c-crit','exposed and feeding a model or agent'],['Open to world',DS.filter(d=>d.sensitive&&d.f.open).length,'c-crit'],['Shared externally',DS.filter(d=>d.sensitive&&d.f.ext).length,'c-med'],['Outside India',DS.filter(d=>d.sensitive&&d.f.foreign).length,'c-high','DPDP / RBI localisation']])}
+ <div class="grid g21">
+  ${panel('Exposure detection by type','How each exposed store is reachable. Select a type to filter the data inventory.',`<div class="bars">${byK.map(([k,n])=>`<div class="hrow clickable" data-dsgo="exp|${k[1]==='Weak or no encryption'?'Open to world':k[1]};risk|Sensitive"><span class="n">${k[1]}</span><div class="track"><div class="fill" style="width:${n/Math.max(...byK.map(x=>x[1]))*100}%;background:${k[2]}"></div></div><span class="v">${n}</span></div>`).join('')}</div><p class="dim" style="font-size:11.5px;margin:10px 0 0">${EXPOSED.length} distinct stores carry at least one of these exposures; ${EXPAI.length} of them feed an AI asset.</p>`)}
+  ${panel('AI assets consuming exposed data',`${cons.length} AI assets read from an exposed sensitive store. Select one to open its inventory record.`,`<div class="list">${cons.map(c=>{const a=aiOf(c.n);return `<div class="li" ${a?`data-asset="${a.id}"`:''}><div class="a"><div>${esc(c.n)}</div><div class="sub" style="text-transform:none">${a?a.type+' · '+a.src:''} · ${c.stores} exposed store${c.stores>1?'s':''} · ${c.pats.size} data patterns</div></div>${a?scoreEl(a.score):''}</div>`}).join('')}</div>`)}
+ </div>
+ ${panel('Exposure → AI lineage','The highest-risk exposed stores and the AI assets they reach. Red dashed edges carry sensitive data out of an exposed store; select a node to open its record.',pgraph('expagg',gn,ge,{head:['Exposed sensitive store','AI consumer','Channel'],cw:300,nw:214,label:'exposure to AI lineage'}))}
+ ${panel('Exposed sensitive data assets',`${EXPOSED.length} exposed stores, those reaching AI first. Select a store for its lineage, AI consumers and evidence.`,tbl(['>Risk','Data store','Service','Cloud · region','Profiles','Exposure','>Patterns','AI consumers'],rows.slice(0,N).map(d=>`<tr data-expo="${d.id}"><td class="r"><span class="num" style="color:${scoreCol(100-d.risk)};font-weight:600">${d.risk}</span></td><td>${esc(d.name)}<span class="s2">${d.cat} · ${d.issues.length} issues</span></td><td class="muted">${d.svc}</td><td class="nowrap">${cdot(d.cloud)} ${d.cloud}<span class="s2">${d.region}</span></td><td>${chipsN(d.prof,2,pchip)}</td><td>${expTypes(d).map(k=>`<span class="tag" style="border-color:${k[2]};color:${k[2]}">${k[1]}</span>`).join('')}</td><td class="r num">${d.pats.length}</td><td>${d.ai.length?`<b class="c-crit">${d.ai.length}</b> <span class="muted">${esc(d.ai.slice(0,2).join(', '))}${d.ai.length>2?' +'+(d.ai.length-2):''}</span>`:'<span class="dim">none</span>'}</td></tr>`))+(rows.length>N?`<div class="btns"><button class="btn" data-dsmore="50">Show 50 more</button><button class="btn" data-dsmore="all">Show all ${rows.length}</button></div>`:''))}`;
+};
+
 /* ---------------- render & events ---------------- */
 function render(){
  const v=VIEWS.find(x=>x.k===state.view)||VIEWS[0];
@@ -2989,7 +3061,7 @@ function render(){
  const on=$('#tabs .tab.on');if(on)on.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function go(k){state.view=k;try{history.replaceState(null,'','#'+k)}catch(e){}closeDrawer();render();window.scrollTo(0,0)}
-const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-adv],[data-pois],[data-poisds],[data-det],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
+const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-expo],[data-adv],[data-pois],[data-poisds],[data-det],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
 document.addEventListener('click',e=>{
  const t=e.target.closest(SPEC);
  if(t){const d=t.dataset;
@@ -3032,6 +3104,7 @@ document.addEventListener('click',e=>{
   if(d.ptpack){const pk=PTPL.find(x=>x[1]===d.ptpack);let n=0;pk[2].forEach(t=>{if(t[2]&&POL.some(p=>p.id===t[2]))return;const w=pwDefault(tplPrefill(t).type,tplPrefill(t));const id='QP-'+(Math.max(...POL.map(p=>parseInt(p.id.slice(3))||0))+1);POL.push({id,n:t[0],cat:t[1],act:w.act,mode:'Monitor',sev:w.sev,fw:[pk[0]],rule:pwRule(w),desc:'Installed from the '+pk[0]+' template pack. Review matches before switching to Enforce.',owner:'you',upd:'05 Oct 2026',ver:1,hits:0});t[2]=id;n++});
    PAUD.unshift(['05 Oct '+new Date().toTimeString().slice(0,5),'you',pk[0],'Installed '+n+(n===1?' template':' templates')+' in Monitor mode']);render();DST.pop();openTemplates();toast(n+(n===1?' policy':' policies')+' added from '+pk[0]+' in Monitor mode');return}
   if(d.pwfrom){const p=POL.find(x=>x.id===d.pwfrom);openWizard({type:p.cat==='gov'?'runtime':p.cat,name:p.n+' (copy)',act:p.act,sev:p.sev});return}
+  if(d.expo){openExposure(d.expo);return}
   if(d.adv){openAdv(d.adv);return}
   if(d.pois){openPois(d.pois);return}
   if(d.poisds){openPoisDs(d.poisds);return}
