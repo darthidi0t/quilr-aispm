@@ -503,7 +503,6 @@ const VIEWS=[
  {k:'dspm',s:'DSPM',ic:'dspm',t:'Data Security Posture',d:'Where sensitive data lives across cloud and SaaS data stores, who can reach it, and which AI models and agents consume it.'},
  {k:'posture',s:'AI Posture',ic:'posture',t:'AI Configuration & Posture',d:'Secure-configuration checks for AI platforms, misconfiguration detection and hardening guidance, evaluated continuously.'},
  {k:'model',s:'Model security',ic:'model',t:'Model Security',d:'Drift, abuse, integrity and malicious-model detection, mapped to the OWASP Top 10 for LLM Applications (2025).'},
- {k:'data',s:'Data protection',ic:'data',t:'Data Protection & Privacy',d:'Sensitive data exposure, residency, PII/SPDI protection and exfiltration monitoring, with DLP, CASB and privacy-vault integrations.'},
  {k:'identity',s:'Identity',ic:'identity',t:'Identity & Access Governance',d:'Agent identities, service accounts and AI endpoint access, measured against least privilege.'},
  {k:'threats',s:'AI Gateway',ic:'threats',t:'Runtime Security · Quilr AI Gateway',d:'Runtime security events produced by the Quilr AI Gateway: prompt injection, jailbreak, PII, data leakage, tool poisoning and abuse, aligned to MITRE ATLAS and OWASP LLM Top 10.'},
  {k:'risk',s:'Compliance',ic:'risk',t:'AI Risk & Compliance',d:'Risk scoring, framework alignment (ISO/IEC 42001, RBI FREE-AI, NIST AI RMF), audit evidence and KRIs. Select any framework for its full report.'},
@@ -896,19 +895,6 @@ function openAbuseLog(id){const a=MAB.find(x=>x.id===id);if(!a)return;const m=MO
  <p style="margin:0">Flagged by the Quilr AI Gateway as use outside the model’s approved purpose or policy.</p>
  ${jbox('quilr.ai_gateway/abuse_event v1',{id:a.id,time:'2026-'+a.t.split(' ')[1].replace('Oct','10').replace('Sep','09')+'-'+a.t.split(' ')[0]+'T'+a.t.split(' ')[2]+':00+05:30',model:a.model,provider:m?m.prov:'',environment:m?m.env:'',pattern:a.p,caller:a.by,action:a.act,policy:pol,detector:'quilr-ai-gateway',disposition:a.act==='alert'?'logged':a.act+'ed'})}
  ${m?`<div class="btns"><button class="btn" data-msec="${m.id}">Open model profile</button><button class="btn" data-nav="threats">View in AI Gateway</button></div>`:''}`,true)}
-V.data=()=>{
- const types=[['Aadhaar number','SPDI',4210],['PAN','SPDI',3880],['Bank account number','Financial',3120],['Card PAN (PCI DSS)','PCI',1960],['Mobile / email','PII',2870],['Health / insurance data','SPDI',640],['Credentials & keys','Secret',190]];
- const surf=[['Prompts',7120],['RAG indexes',4980],['Model responses',2210],['Training datasets',2650],['Agent logs',1430]];
- return `${kpis([['Sensitive records exposed','18.4k','c-med','in AI-reachable stores'],['PII detections · 24h','2,931'],['Redacted before model','12.7k','c-ok','last 7 days'],['Residency violations','5','c-crit','DPDP / RBI localisation'],['Exfiltration blocked','46','c-high','last 7 days'],['Integrations','4 / 5','','1 not configured']])}
- <div class="grid g3">
-  ${panel('Sensitive data by type','Records detected across prompts, indexes, datasets and logs.',`<div class="bars">${types.map(t=>`<div class="hrow"><span class="n">${t[0]}</span><div class="track"><div class="fill" style="width:${t[2]/4210*100}%;background:${t[1]==='Secret'?'var(--crit)':t[1]==='SPDI'||t[1]==='PCI'?'var(--high)':'var(--med)'}"></div></div><span class="v">${(t[2]/1000).toFixed(1)}k</span></div>`).join('')}</div>`)}
-  ${panel('Where it surfaces','Same records, by AI surface.',`<div class="bars">${surf.map(s=>`<div class="hrow"><span class="n">${s[0]}</span><div class="track"><div class="fill" style="width:${s[1]/7120*100}%"></div></div><span class="v">${(s[1]/1000).toFixed(1)}k</span></div>`).join('')}</div>`)}
-  ${panel('Protection integrations','Signals in, enforcement out.',`<div class="list">${[['Microsoft Purview DLP','Labels + DLP verdicts','ok','Connected'],['Netskope CASB','Shadow AI + inline block','ok','Connected'],['Skyflow Privacy Vault','Tokenise PII before prompts','ok','Connected'],['Zscaler ZIA','SWG logs for discovery','ok','Connected'],['Symantec DLP','Endpoint DLP','off','Not configured']].map(i=>`<div class="li"><div class="a"><div>${i[0]}</div><div class="sub" style="text-transform:none">${i[1]}</div></div>${chip(i[3],i[2])}</div>`).join('')}</div>`)}
- </div>
- ${panel('Data localisation & residency','Customer data must be processed in India under the RBI storage-of-payment-data directive and your DPDP policy.',tbl(['Asset','Data class','Required','Actual','Status'],[['Wealth Advisor Bot','Customer PII, holdings','India','us-west1 (GCP)','Violation'],['gpt-4o-prod-eus2','Prompts incl. PII','India','eastus2 (Azure)','Violation'],['SDR Outreach Agent','Business contacts','India','Salesforce Hyperforce · global','Review'],['KYC Document Extractor','Aadhaar, PAN images','India','ap-south-1 (AWS)','Compliant'],['credit-policy-index','Internal policy','India','centralindia (Azure)','Compliant']].map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td class="mono">${r[2]}</td><td class="mono">${r[3]}</td><td>${chip(r[4],r[4]==='Compliant'?'ok':r[4]==='Review'?'warn':'bad')}</td></tr>`)))}
- ${panel('AI data exfiltration','Attempts to move sensitive data out through AI channels.',tbl(['Time','Channel','What','Volume','Action'],[['11:14','Agent tool call','Wealth Advisor Bot asked to email holdings CSV to a gmail.com address','1,204 rows','block'],['10:57','Shadow AI · ChatGPT (personal)','Card PAN list pasted by Treasury Ops user','38 PANs','block'],['10:22','RAG response','customer-support-kb returned another customer’s address','1 record','redact'],['09:40','Inference API','Systematic extraction of training data from fraud-model-v7','6,000 calls','alert']].map(r=>`<tr><td class="mono">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="mono nowrap">${r[3]}</td><td><span class="act act-${r[4]}">${r[4]}</span></td></tr>`)))}`;
-};
-
 V.identity=()=>{
  const nhi=[['mi-credit-copilot','Managed identity','Loan Underwriting Copilot',42,9,'12d','medium'],['sa-wealth-advisor@…iam','GCP service account','Wealth Advisor Bot',118,11,'214d','critical'],['role/kyc-bedrock-agent','AWS IAM role','KYC Document Extractor',36,14,'31d','medium'],['gh-mcp-pat-01','GitHub PAT','github-mcp-server',24,3,'167d','high'],['svc-mktg-automation','Azure OpenAI key','gpt-4o-prod-eus2','key: full','—','203d','high'],['agentforce-int-user','Salesforce integration user','SDR Outreach Agent',61,12,'45d','medium'],['copilot-maker-conn','Power Platform connection','Jira Assistant',18,7,'n/a','low']];
  return `${kpis([['Non-human identities','286','','AI-attached'],['Agent identities','61'],['Over-privileged','47','c-high','>50% permissions unused'],['Unused permissions','63%','c-med','median per identity'],['Keys > 90 days','22','c-high'],['PAM-vaulted','71%','','203 of 286']])}
@@ -1619,7 +1605,7 @@ aws cloudformation create-stack-instances \\
 }`,
   checks:[['AssumeRole from Quilr','Pass','11 of 11 accounts'],['Bedrock and Agents readable','Pass','ap-south-1, us-east-1'],['SageMaker readable','Pass','4 accounts'],['Data-plane deny in effect','Pass','InvokeModel returns AccessDenied'],['CloudTrail data events for Bedrock','Partial','missing in nwf-research']]},
  {id:'azure',g:'Cloud accounts',n:'Microsoft Azure',ic:'Azure OpenAI',st:'Connected',sum:'7 subscriptions · management group nwf-root',
-  powers:['inventory','cspm','identity','attack','data','dspm'],
+  powers:['inventory','cspm','identity','attack','dspm'],
   steps:[
    ['Create the app registration','Create a service principal for Quilr and give it Reader at the root management group, so new subscriptions are picked up automatically.',['bash · Azure CLI',`az ad sp create-for-rbac \\
   --name quilr-aispm-reader \\
@@ -1737,7 +1723,7 @@ helm install quilr-agent quilr/quilr-agent \\
  {id:'git',g:'Code repositories',n:'GitHub Enterprise',ic:'Self-hosted (EKS)',st:'Connected',sum:'GitHub App on 42 repos',powers:['inventory','supply'],
   steps:[['Install the Quilr GitHub App on selected repositories',null,['text · GitHub App permissions','Contents: read\nMetadata: read\nPull requests: read (optional, for drift alerts)']],['Choose repositories','Pick repos that contain agent code, prompts, notebooks or model pipelines.',null]],
   perms:[['Contents: read','System instructions, tool definitions, model references, dependencies','Workload analysis, ML-SBOM']],checks:[['App installed','Pass','42 repos'],['Last scan','Pass','05 Oct 10:40']]},
- {id:'gw',g:'Runtime',n:'Quilr AI Gateway',ic:'Azure OpenAI',st:'Partial',sum:'5 clusters · 54 of 61 agents routed',powers:['threats','data','observe','policy'],
+ {id:'gw',g:'Runtime',n:'Quilr AI Gateway',ic:'Azure OpenAI',st:'Partial',sum:'5 clusters · 54 of 61 agents routed',powers:['threats','dspm','observe','policy'],
   steps:[['Deploy a gateway cluster close to each workload',null,['bash · Helm',`helm install qgw quilr/ai-gateway \\
   --namespace quilr-gateway --create-namespace \\
   --set tenantId=${QX.tenant} \\
@@ -1754,10 +1740,10 @@ AWS_ENDPOINT_URL_BEDROCK_RUNTIME=https://qgw-aps1-01.ai.nwf.internal/bedrock
 # MCP: register servers through the gateway proxy
 MCP_PROXY=https://qgw-aps1-02.ai.nwf.internal/mcp`]],['Block direct egress to AI providers','Add egress rules so only gateway subnets reach model endpoints. The 7 unrouted agents show on the AI Gateway page.',null],['Attach policies','Choose which QuilrQL policies run on input, output and tool calls.',null]],
   perms:[['Network path from agents to gateway','Inline inspection of prompts, responses and tool calls','AI Gateway, Data protection, Traces'],['Upstream credentials (managed identity / IAM role)','Gateway calls models on the caller\'s behalf','Runtime']],checks:[['Clusters healthy','Pass','5 of 5'],['Agents routed','Partial','54 of 61'],['Events exported','Pass','AISPM, Splunk HEC']]},
- {id:'work',g:'Workforce',n:'Browser extension, SWG and OAuth',ic:'Copilot Studio',st:'Connected',sum:'extension on 2,880 devices · Netskope · Zscaler',powers:['shadow','data'],
+ {id:'work',g:'Workforce',n:'Browser extension, SWG and OAuth',ic:'Copilot Studio',st:'Connected',sum:'extension on 2,880 devices · Netskope · Zscaler',powers:['shadow','dspm'],
   steps:[['Force-install the Quilr browser extension','Push through Intune or Chrome Enterprise.',['json · Chrome policy',JSON.stringify({ExtensionInstallForcelist:['kqlrnpdmfgcbhoeaijnlpoeqrsuvwxyz;https://clients2.google.com/service/update2/crx']},null,2)]],['Connect web gateway logs','Netskope and Zscaler ZIA logs reveal AI apps used off-extension.',null],['Read OAuth grants','Uses the Graph permission granted in the Azure connector.',null]],
   perms:[['Extension: page metadata on AI sites','App, account type, upload events','Shadow AI · Workforce'],['SWG log read','Destinations and volumes','Shadow AI']],checks:[['Extension coverage','Pass','96% of managed devices'],['Netskope feed','Pass',''],['Zscaler feed','Pass','']]},
- {id:'int',g:'Integrations',n:'SIEM, ticketing, DLP and PAM',ic:'Databricks',st:'Partial',sum:'Splunk · Jira · Purview · Skyflow · CyberArk · Symantec not configured',powers:['threats','data','identity','risk'],
+ {id:'int',g:'Integrations',n:'SIEM, ticketing, DLP and PAM',ic:'Databricks',st:'Partial',sum:'Splunk · Jira · Purview · Skyflow · CyberArk · Symantec not configured',powers:['threats','dspm','identity','risk'],
   steps:[['Splunk: create a HEC token for index ai_runtime',null,['text · settings','URL: https://splunk.nwf.internal:8088/services/collector\nIndex: ai_runtime\nSourcetype: quilr:gateway']],['Jira: authorise the Quilr app for project SEC',null,null],['Purview, Skyflow, CyberArk: add API credentials','Labels and DLP verdicts in, tokenisation for prompts, vault coverage for non-human identities.',null],['Symantec DLP: not configured','Optional endpoint DLP signal.',null]],
   perms:[['Splunk HEC token','Send runtime events','AI Gateway'],['Jira OAuth','Create and update tickets','All findings'],['Purview Information Protection read','Sensitivity labels','Data protection, DSPM'],['CyberArk read','Vaulted accounts','Identity']],checks:[['Splunk','Pass','412 events/min'],['Jira','Pass','project SEC'],['Symantec DLP','Not configured','optional']]}
 ];
@@ -1772,7 +1758,7 @@ const PHASES=[
  ['Assign owners and frameworks','Map business owners and pick frameworks to report on',[],60,'Compliance, Risk register']
 ];
 const CACCTS=[['AWS','nwf-prod-ops','412783920155','prod',1,1,1,1],['AWS','nwf-data-science','578210334901','prod',1,0,1,1],['AWS','nwf-research','690114275532','dev',1,1,0,1],['AWS','nwf-devprod','330987654120','dev',1,1,1,1],['AWS','nwf-data-platform','204518936722','prod',1,1,1,1],['AWS','nwf-sandbox-2','118300472951','dev',1,0,0,0],['Azure','nwf-prod-credit','c3a1f0e2-…-9b7d','prod',1,1,1,1],['Azure','nwf-prod-platform','8d2e44b1-…-f2a8','prod',1,1,0,1],['Azure','nwf-dev-sandbox','5f0c9a7e-…-1d33','dev',1,1,1,0],['GCP','nwf-wealth-prod-31','nwf-wealth-prod-31','prod',1,1,1,1],['GCP','nwf-marketing-dev-12','nwf-marketing-dev-12','dev',1,1,1,1],['GCP','nwf-ai-platform-07','nwf-ai-platform-07','prod',1,1,1,1]];
-const NEEDS=[['inventory',['aws','azure','gcp','aiplat','cps','sfdc','hf','k8s','git']],['cspm',['aws','azure','gcp']],['dspm',['aws','azure','gcp','aiplat','int']],['posture',['aws','azure','gcp','cps']],['model',['aws','gcp','hf','gw']],['data',['gw','work','int']],['identity',['aws','azure','gcp','int']],['threats',['gw']],['risk',['aws','azure','gcp','gw','int']],['observe',['gw','aiplat','flow']],['supply',['git','hf','aiplat','k8s']],['attack',['aws','azure','gcp','flow']],['shadow',['work','flow']]];
+const NEEDS=[['inventory',['aws','azure','gcp','aiplat','cps','sfdc','hf','k8s','git']],['cspm',['aws','azure','gcp']],['dspm',['aws','azure','gcp','aiplat','int','gw','work']],['posture',['aws','azure','gcp','cps']],['model',['aws','gcp','hf','gw']],['identity',['aws','azure','gcp','int']],['threats',['gw']],['risk',['aws','azure','gcp','gw','int']],['observe',['gw','aiplat','flow']],['supply',['git','hf','aiplat','k8s']],['attack',['aws','azure','gcp','flow']],['shadow',['work','flow']]];
 const stc=s=>s==='Connected'||s==='Pass'?'ok':s==='Partial'||s==='Needs attention'?'warn':s==='Fail'?'bad':'off';
 
 V.setup=()=>{
@@ -1879,7 +1865,7 @@ const VT={
  owner:{t:'Business owner not assigned',d:'Discovery & Inventory',sev:'low',rule:'QAI-INV-003',fw:['ISO 42001 A.3.2'],ok:a=>!a.record||a.status==='Pending review',attr:()=>({business_owner:null,technical_owner:'from tag'}),exp:'Named business owner on the record.',why:'Findings have no one to approve fixes or exceptions.',fix:'Assign an owner.',cmd:a=>`quilr inventory set-owner "${a.name}" --business-owner <email>`}
 };
 const VIOL=[],VBY={},SEVW={critical:40,high:25,medium:10,low:3},SLA={critical:3,high:14,medium:30,low:90};
-const DOMS=[['Discovery & Inventory','inventory'],['Configuration & Posture','posture'],['Model Security','model'],['Data Protection','data'],['Identity & Access','identity'],['Threat Detection','threats'],['Risk & Compliance','risk'],['Observability','observe'],['Supply Chain & MLOps','supply'],['Attack Path & Exposure','attack']];
+const DOMS=[['Discovery & Inventory','inventory'],['Configuration & Posture','posture'],['Model Security','model'],['Data Protection','dspm'],['Identity & Access','identity'],['Threat Detection','threats'],['Risk & Compliance','risk'],['Observability','observe'],['Supply Chain & MLOps','supply'],['Attack Path & Exposure','attack']];
 (function(){
  const HM={'F-1042':'dep_public','F-1039':'agent_write','F-1033':'region','F-1031':'pickle','F-1027':'prompt_secret','F-1024':'agent_noguard','F-1022':'explain','F-1019':'drift','F-1017':'unenc','F-1015':'provenance','F-1011':'mcp_write','F-1009':'nodlp','F-1008':'kn_everyone'};
  let n=2000;
@@ -2033,7 +2019,7 @@ state.ds={page:'overview',f:DSF0(),n:50,ik:null,rOff:{}};
 const CLOUDS=['AWS','Azure','GCP','Microsoft 365','Databricks','Salesforce'];
 const CLC={AWS:'#d9822b',Azure:'#2f6fd6',GCP:'#3b82f6','Microsoft 365':'#7c5cd6',Databricks:'#d4483b',Salesforce:'#1798c1'};
 const cdot=c=>`<span class="srcdot" style="background:${CLC[c]}">${c[0]}</span>`;
-const DSNAV=[['Overview','overview'],['Assets inventory',null,[['All assets','all'],['Databases','databases'],['Storage buckets','buckets'],['Backups','backups'],['Disks','disks'],['AI datasets','aidata'],['SaaS stores','saas']]],['Objects inventory',null,[['Files','files'],['Tables','tables'],['Fields','fields']]],['Data pattern inventory','patterns'],['Data security issues',null,[['Threats','threats'],['Posture','posture']]],['Detection rules','rules'],['Data classification',null,[['Data patterns','clspat'],['Data profiles','clsprof'],['Settings','clsset']]]];
+const DSNAV=[['Overview','overview'],['Assets inventory',null,[['All assets','all'],['Databases','databases'],['Storage buckets','buckets'],['Backups','backups'],['Disks','disks'],['AI datasets','aidata'],['SaaS stores','saas']]],['Objects inventory',null,[['Files','files'],['Tables','tables'],['Fields','fields']]],['Data pattern inventory','patterns'],['Data security issues',null,[['Threats','threats'],['Posture','posture']]],['AI data protection',null,[['Overview','dpover'],['Data surfaces','surfaces'],['AI exfiltration','exfil'],['Protection integrations','protint'],['Residency','residency']]],['Detection rules','rules'],['Data classification',null,[['Data patterns','clspat'],['Data profiles','clsprof'],['Settings','clsset']]]];
 
 function dsRows(){const f=state.ds.f,q=f.q.toLowerCase(),cat=DCAT[state.ds.page];
  return DS.filter(d=>(!cat||d.cat===cat)&&(f.svc==='All'||d.svc===f.svc)&&(f.cloud==='All'||d.cloud===f.cloud)&&(f.prof==='All'||d.prof.includes(f.prof))&&(f.exp==='All'||(f.exp==='Open to world'?d.f.open:f.exp==='Shared externally'?d.f.ext:f.exp==='Public objects'?d.f.pubobj:f.exp==='Outside India'?d.f.foreign:f.exp==='Feeds AI'?d.ai.length>0:true))&&(f.region==='All'||(RGRP[d.region]?RGRP[d.region][0]:(REGXY[d.region]||[])[2])===f.region)&&(f.pat==='All'||d.pats.includes(+f.pat))&&(f.risk==='All'||(f.risk==='At risk'?d.atRisk:f.risk==='Sensitive'?d.sensitive:!d.sensitive))&&(!q||(d.name+' '+d.svc+' '+d.acct+' '+d.pats.map(p=>DPAT[p][0]).join(' ')).toLowerCase().includes(q))).sort((a,b)=>b.risk-a.risk||b.records-a.records)}
@@ -2061,7 +2047,7 @@ const REGXY={'ap-south-1':[72.8,19,'Mumbai'],'ap-south-2':[78.5,17.4,'Hyderabad'
 
 V.dspm=()=>{
  const pg=state.ds.page;
- const nav=`<nav class="subnav" aria-label="DSPM sections">${DSNAV.map(([l,k,ch])=>ch?`<div class="sng">${l}</div>${ch.map(([cl,ck])=>`<button class="snb sub ${pg===ck?'on':''}" data-dsp="${ck}">${cl}<span>${ck in DCAT?fmt(ck==='all'?DS.length:DS.filter(d=>d.cat===DCAT[ck]).length):ck==='threats'?DTHR.length:ck==='posture'?DSI.length:''}</span></button>`).join('')}`:`<button class="snb ${pg===k?'on':''}" data-dsp="${k}">${l}</button>`).join('')}</nav>`;
+ const nav=`<nav class="subnav" aria-label="DSPM sections">${DSNAV.map(([l,k,ch])=>ch?`<div class="sng">${l}</div>${ch.map(([cl,ck])=>`<button class="snb sub ${pg===ck?'on':''}" data-dsp="${ck}">${cl}<span>${ck in DCAT?fmt(ck==='all'?DS.length:DS.filter(d=>d.cat===DCAT[ck]).length):ck==='threats'?DTHR.length:ck==='posture'?DSI.length:ck==='exfil'?EXFIL.length:ck==='surfaces'?SURF.length:ck==='residency'?RESID.filter(r=>r.st==='Violation').length:ck==='protint'?PROTINT.filter(p=>p.st==='ok').length:''}</span></button>`).join('')}`:`<button class="snb ${pg===k?'on':''}" data-dsp="${k}">${l}</button>`).join('')}</nav>`;
  return `<div class="dsp">${nav}<div class="dsmain">${(DSV[pg in DCAT&&pg!=='all'?'all':pg]||DSV.overview)()}</div></div>`;
 };
 const DSV={};
@@ -2632,6 +2618,112 @@ V.cspm=()=>{
  ${panel('Internet exposure of AI-hosting resources',`${EXP.length} resources reachable from 0.0.0.0/0 · ${EXP.filter(e=>e.ai).length} host an AI workload. Select one for its record.`,tbl(['Resource','Cloud','Rule','Port','Public IP','AI asset'],EXP.slice().sort((a,b)=>b.ai-a.ai).slice(0,14).map(e=>`<tr data-cexp="${e.id}"><td class="mono">${esc(e.res)}</td><td class="nowrap">${e.cloud}</td><td class="mono">${esc(e.rule)}</td><td class="mono">${e.port}</td><td class="mono c-high">${e.ip}</td><td>${e.ai?esc(e.asset):'<span class="dim">—</span>'}</td></tr>`))+(EXP.length>14?`<p class="dim" style="font-size:11.5px;margin:8px 0 0">Showing 14 of ${EXP.length}.</p>`:''))}`;
 };
 
+/* ---------------- AI data protection (inside DSPM) ---------------- */
+const DTYPE=[['Aadhaar number','SPDI',4210],['PAN','SPDI',3880],['Bank account number','Financial',3120],['Card PAN (PCI DSS)','PCI',1960],['Mobile / email','PII',2870],['Health / insurance data','SPDI',640],['Credentials & keys','Secret',190]];
+const SURF=[
+ {k:'prompts',name:'Prompts',n:7120,pats:['Aadhaar number','PAN','Mobile / email','Card PAN (PCI DSS)'],desc:'Sensitive data found in prompts users and agents send to models, inspected inline by the AI Gateway.'},
+ {k:'rag',name:'RAG indexes',n:4980,pats:['Mobile / email','Bank account number','Health / insurance data'],desc:'Sensitive records embedded in vector indexes that ground model answers.'},
+ {k:'responses',name:'Model responses',n:2210,pats:['PAN','Mobile / email','Bank account number'],desc:'Sensitive data returned in model and tool responses, redacted before the user sees it.'},
+ {k:'training',name:'Training datasets',n:2650,pats:['Card PAN (PCI DSS)','Aadhaar number','Bank account number'],desc:'Sensitive records inside datasets used to train or fine-tune models.'},
+ {k:'agentlogs',name:'Agent logs',n:1430,pats:['Mobile / email','Credentials & keys'],desc:'Sensitive data captured in agent traces, tool-call logs and transcripts.'}];
+const SURFBY=['Loan Underwriting Copilot','KYC Document Extractor','Wealth Advisor Bot','SDR Outreach Agent','customer-support-kb','gpt-4o-prod-eus2','collections fine-tune','fraud-model-v7'];
+function surfDetections(s){const out=[];for(let i=0;i<8;i++){const h=num(s.k+'d'+i);out.push({id:s.k.toUpperCase().slice(0,3)+'-'+String(i+1).padStart(3,'0'),pat:s.pats[h%s.pats.length],asset:SURFBY[(h>>3)%SURFBY.length],t:['05 Oct 11:'+(10+h%49),'05 Oct 10:'+(10+(h>>2)%49),'04 Oct 17:'+(10+(h>>4)%49)][h%3],n:1+h%640,act:['redact','block','alert','redact'][(h>>5)%4]});}return out;}
+const EXMASK={'Aadhaar number':'XXXX XXXX 9264','PAN':'XXXXX4821X','Bank account number':'XXXXXX7731','Card PAN (PCI DSS)':'XXXX XXXX XXXX 4821','Mobile / email':'+91 98XXXXXX10','Health / insurance data':'[redacted]','Credentials & keys':'AKIA••••••7Q'};
+
+const EXFIL=[
+ ['EXF-001','11:14','Agent tool call','tool','Wealth Advisor Bot asked to email a holdings CSV to a gmail.com address','1,204 rows','block','critical','QP-03','Wealth Advisor Bot','retail session 8f2e…','Customer PII, holdings'],
+ ['EXF-002','10:57','Shadow AI · ChatGPT (personal)','shadow','Card PAN list pasted by a Treasury Ops user','38 PANs','block','high','QP-01','ChatGPT (personal)','treasury-user · Mumbai','Card PAN (PCI)'],
+ ['EXF-003','10:22','RAG response','rag','customer-support-kb returned another customer’s address','1 record','redact','medium','QP-11','customer-support-kb','customer chat 41c0…','Address (PII)'],
+ ['EXF-004','09:40','Inference API','api','Systematic extraction of training data from fraud-model-v7','6,000 calls','alert','high','QP-14','fraud-model-v7','svc-mktg-automation','Model training data'],
+ ['EXF-005','09:12','Agent tool call','tool','KYC agent attempted to write Aadhaar images to an unapproved S3 bucket','214 objects','block','high','QP-05','KYC Document Extractor','ops-kyc-batch','Aadhaar images'],
+ ['EXF-006','08:48','Shadow AI · Gemini (consumer)','shadow','Source code with embedded DB credentials pasted','2 files','block','high','QP-19','Google Gemini (consumer)','eng-user · Bengaluru','Credentials & keys'],
+ ['EXF-007','08:30','Email draft','email','SDR agent drafted an email with a customer contact list attached','312 contacts','block','medium','QP-02','SDR Outreach Agent','sales rep · Delhi','Business contacts'],
+ ['EXF-008','07:59','Code assistant','code','Cursor sent a file containing bank account numbers to a hosted model','46 records','alert','medium','QP-30','Cursor','eng-user · Pune','Bank account numbers'],
+ ['EXF-009','07:41','File upload','upload','Loan applications CSV uploaded to a personal Google Drive via browser','1,880 rows','block','high','QP-32','Chrome upload','branch-user · Nashik','PAN, income'],
+ ['EXF-010','07:20','RAG response','rag','Policy assistant surfaced an internal salary band table','1 table','redact','low','QP-11','credit-policy-index','employee · HR','Internal confidential'],
+ ['EXF-011','06:55','Inference API','api','High-volume embedding calls reconstructing source documents','9,400 calls','alert','medium','QP-14','text-embedding-3-large','partner-api','Embedded documents'],
+ ['EXF-012','06:30','Agent tool call','tool','Collections agent requested all debtors’ balances in one call','1 bulk query','block','high','QP-12','llama-3.1-8b-collections-ft','branch-user · Pune-04','Customer PII']
+].map(r=>({id:r[0],t:r[1],ch:r[2],chK:r[3],what:r[4],vol:r[5],act:r[6],sev:r[7],pol:r[8],asset:r[9],by:r[10],dcls:r[11]}));
+const EXCH=[['Agent tool call','tool'],['Shadow AI','shadow'],['RAG response','rag'],['Inference API','api'],['Email draft','email'],['Code assistant','code'],['File upload','upload']];
+
+const PROTINT=[
+ {id:'purview',name:'Microsoft Purview DLP',vendor:'Microsoft',role:'Labels + DLP verdicts',st:'ok',sends:'Sensitivity labels and DLP match verdicts for files and messages',enforces:'Quilr reads labels to classify RAG sources and blocks labelled content in prompts',sync:'2 min ago',ev:'1,412 label lookups · 24h'},
+ {id:'netskope',name:'Netskope CASB',vendor:'Netskope',role:'Shadow AI + inline block',st:'ok',sends:'SWG and CASB logs of AI app usage and inline block events',enforces:'Inline block of file uploads to unsanctioned AI apps',sync:'1 min ago',ev:'38 blocks · 24h'},
+ {id:'skyflow',name:'Skyflow Privacy Vault',vendor:'Skyflow',role:'Tokenise PII before prompts',st:'ok',sends:'Tokenisation and detokenisation of PII fields',enforces:'PII is tokenised before reaching models and detokenised for authorised callers',sync:'4 min ago',ev:'7,120 tokenisations · 24h'},
+ {id:'zscaler',name:'Zscaler ZIA',vendor:'Zscaler',role:'SWG logs for discovery',st:'ok',sends:'Secure Web Gateway logs used for Shadow AI discovery',enforces:'URL-category policy for AI destinations',sync:'3 min ago',ev:'2.1M web events · 24h'},
+ {id:'symantec',name:'Symantec DLP',vendor:'Broadcom',role:'Endpoint DLP',st:'off',sends:'—',enforces:'—',sync:'never',ev:'not configured'}];
+
+const RESID=[
+ ['Wealth Advisor Bot','Customer PII, holdings','India','us-west1 (GCP)','Violation','Grounding data and the reasoning engine run in GCP us-west1. Move to asia-south1 or route through the India gateway.'],
+ ['gpt-4o-prod-eus2','Prompts including PII','India','eastus2 (Azure)','Violation','The shared LLM gateway terminates in East US. Provision an India Azure OpenAI deployment and pin routing.'],
+ ['SDR Outreach Agent','Business contacts','India','Salesforce Hyperforce · global','Review','Hyperforce region is global pending the India data-residency migration.'],
+ ['prompt-logs','Prompts with PII','India','eastus2 (Azure)','Violation','Log Analytics workspace is in East US; retains prompts for 90 days. Re-home to Central India.'],
+ ['KYC Document Extractor','Aadhaar, PAN images','India','ap-south-1 (AWS)','Compliant','Processing and storage are in Mumbai; meets RBI and DPDP localisation.'],
+ ['credit-policy-index','Internal policy','India','centralindia (Azure)','Compliant','Index and source documents are in Central India.']
+].map((r,i)=>({id:'RES-'+(i+1),asset:r[0],cls:r[1],req:r[2],actual:r[3],st:r[4],detail:r[5]}));
+
+function openSurface(k){const s=SURF.find(x=>x.k===k);if(!s)return;const det=surfDetections(s);
+ drawer(`${dhead('Data surface',s.name)}
+ <div class="meta"><span class="lbl">Sensitive records</span><b class="num">${fmt(s.n)}</b><span class="lbl">Patterns</span><b class="num">${s.pats.length}</b></div>
+ <p style="margin:0">${esc(s.desc)}</p>
+ ${panel('Data patterns on this surface',' ',`<div class="bars">${s.pats.map((p,i)=>{const t=DTYPE.find(x=>x[0]===p)||[p,'',1000];const v=Math.round(s.n*[0.42,0.3,0.18,0.1][i%4]);return bar(p,v,s.n,fmtN(v),t[1]==='Secret'?'var(--crit)':t[1]==='SPDI'||t[1]==='PCI'?'var(--high)':'var(--med)')}).join('')}</div>`)}
+ ${panel('Recent detections','Each detection is inspected inline; sensitive values are stored as a hash with a masked preview.',tbl(['ID','Pattern','Asset','When','>Records','Action'],det.map(d=>`<tr data-exlog="${s.k}|${d.id}"><td class="mono">${d.id}</td><td>${esc(d.pat)}</td><td>${esc(d.asset)}</td><td class="mono nowrap">${d.t}</td><td class="r num">${fmtN(d.n)}</td><td><span class="act act-${d.act}">${d.act}</span></td></tr>`)))}`,true)}
+
+function openSurfLog(surfK,id){const s=SURF.find(x=>x.k===surfK);if(!s)return;const d=surfDetections(s).find(x=>x.id===id);if(!d)return;
+ drawer(`${dhead('Detection log · '+d.id,s.name)}
+ <div class="meta"><span class="act act-${d.act}">${d.act}</span><span class="tag">${esc(d.pat)}</span><span class="mono">${d.t} IST</span></div>
+ ${jbox('quilr.dspm.detection/v1',{id:d.id,surface:s.name,pattern:d.pat,asset:d.asset,time:d.t,records:d.n,action:d.act,masked_sample:EXMASK[d.pat]||'[redacted]',classifier:/Aadhaar|Card/.test(d.pat)?'regex+checksum':'regex+context',stored:'sha256 hash + masked preview',retention_days:30})}`,true)}
+
+function openExfil(id){const e=EXFIL.find(x=>x.id===id);if(!e)return;
+ drawer(`${dhead('AI data exfiltration · '+e.id,esc(e.ch))}
+ <div class="meta"><span class="act act-${e.act}">${e.act}</span>${pill(e.sev)}<span class="lbl">Policy</span><span style="color:var(--fg)">${e.pol}</span><span class="mono">${e.t} IST</span></div>
+ <p style="margin:0">${esc(e.what)}</p>
+ ${panes([['Summary',`<dl class="kv"><dt>Channel</dt><dd>${esc(e.ch)}</dd><dt>AI asset / app</dt><dd>${esc(e.asset)}</dd><dt>Data class</dt><dd>${esc(e.dcls)}</dd><dt>Volume</dt><dd class="mono">${esc(e.vol)}</dd><dt>Caller</dt><dd>${esc(e.by)}</dd><dt>Action</dt><dd><span class="act act-${e.act}">${e.act}</span></dd><dt>Policy</dt><dd>${e.pol}</dd></dl><div class="btns"><button class="btn pri" data-toast="Ticket opened for ${e.id}">Open ticket</button><button class="btn" data-nav="policy">View policy ${e.pol}</button></div>`],
+  ['Event log',jbox('quilr.dspm.exfiltration/v1',{id:e.id,time:'2026-10-05T'+e.t+':00+05:30',channel:e.ch,channel_key:e.chK,ai_asset:e.asset,data_class:e.dcls,volume:e.vol,caller:e.by,action:e.act,policy_id:e.pol,detector:'quilr-dspm-ddr',disposition:e.act==='alert'?'logged':e.act+'ed'})]])}`,true)}
+
+function openProtInt(id){const p=PROTINT.find(x=>x.id===id);if(!p)return;
+ drawer(`${dhead('Protection integration',p.name)}
+ <div class="meta">${chip(p.st==='ok'?'Connected':'Not configured',p.st)}<span class="tag">${p.vendor}</span><span class="lbl">Last sync</span><span class="mono">${p.sync}</span></div>
+ <p style="margin:0">${esc(p.role)}.</p>
+ ${panel('Integration detail',' ',`<dl class="kv"><dt>Vendor</dt><dd>${p.vendor}</dd><dt>Role</dt><dd>${esc(p.role)}</dd><dt>Signals in</dt><dd>${esc(p.sends)}</dd><dt>Enforcement out</dt><dd>${esc(p.enforces)}</dd><dt>Activity</dt><dd class="mono">${esc(p.ev)}</dd><dt>Status</dt><dd>${chip(p.st==='ok'?'Connected':'Not configured',p.st)}</dd></dl>${p.st==='ok'?`${jbox('last sync',{integration:p.id,vendor:p.vendor,status:'connected',last_sync:p.sync,throughput:p.ev})}`:'<div class="btns"><button class="btn pri" data-nav="setup">Configure in Setup</button></div>'}`)}`,true)}
+
+function openResid(id){const r=RESID.find(x=>x.id===id);if(!r)return;
+ drawer(`${dhead('Data residency · '+r.asset,r.cls)}
+ <div class="meta">${chip(r.st,r.st==='Compliant'?'ok':r.st==='Review'?'warn':'bad')}<span class="lbl">Required</span><span class="mono">${r.req}</span><span class="lbl">Actual</span><span class="mono">${r.actual}</span></div>
+ <p style="margin:0">${esc(r.detail)}</p>
+ ${jbox('quilr.dspm.residency/v1',{id:r.id,asset:r.asset,data_class:r.cls,required_region:r.req,actual_region:r.actual,status:r.st,regulation:['DPDP Sec. 16','RBI storage-of-payment-data directive'],remediation:r.st==='Compliant'?'none':'re-home to an India region'})}`,true)}
+
+/* DSPM sub-pages */
+DSV.dpover=()=>{const sumN=SURF.reduce((s,x)=>s+x.n,0),blocked=EXFIL.filter(e=>e.act==='block').length,viol=RESID.filter(r=>r.st==='Violation').length,conn=PROTINT.filter(p=>p.st==='ok').length;
+ return `${secH('AI data protection','Sensitive data across AI surfaces, exfiltration attempts, residency and the DLP, CASB and privacy-vault integrations that feed and enforce protection.')}
+ ${kpis([['Sensitive records',fmtN(sumN),'c-med','across AI surfaces'],['PII detections · 24h','2,931'],['Redacted before model','12.7k','c-ok','last 7 days'],['Residency violations',viol,'c-crit','DPDP / RBI localisation'],['Exfiltration blocked',blocked,'c-high','today'],['Integrations',conn+' / '+PROTINT.length,'',(PROTINT.length-conn)+' not configured']])}
+ <div class="grid g3">
+  ${panel('Sensitive data by type','Records detected across prompts, indexes, datasets and logs.',`<div class="bars">${DTYPE.map(t=>`<div class="hrow"><span class="n">${t[0]}</span><div class="track"><div class="fill" style="width:${t[2]/4210*100}%;background:${t[1]==='Secret'?'var(--crit)':t[1]==='SPDI'||t[1]==='PCI'?'var(--high)':'var(--med)'}"></div></div><span class="v">${(t[2]/1000).toFixed(1)}k</span></div>`).join('')}</div>`)}
+  ${panel('Where it surfaces','Same records, by AI surface. Select a surface for its detections.',`<div class="bars">${SURF.map(s=>`<div class="hrow clickable" data-surf="${s.k}"><span class="n">${s.name}</span><div class="track"><div class="fill" style="width:${s.n/SURF[0].n*100}%"></div></div><span class="v">${(s.n/1000).toFixed(1)}k</span></div>`).join('')}</div>`)}
+  ${panel('Protection integrations','Signals in, enforcement out. Select one for detail.',`<div class="list">${PROTINT.map(p=>`<div class="li clickable" data-protint="${p.id}"><div class="a"><div>${p.name}</div><div class="sub" style="text-transform:none">${esc(p.role)}</div></div>${chip(p.st==='ok'?'Connected':'Not configured',p.st)}</div>`).join('')}</div>`)}
+ </div>
+ ${panel('AI data exfiltration',`${EXFIL.length} attempts to move sensitive data out through AI channels. Select an event for its log.`,tbl(['Time','Channel','What','Volume','Action'],EXFIL.slice(0,6).map(e=>`<tr data-exfil="${e.id}"><td class="mono nowrap">${e.t}</td><td>${esc(e.ch)}</td><td>${esc(e.what)}</td><td class="mono nowrap">${esc(e.vol)}</td><td><span class="act act-${e.act}">${e.act}</span></td></tr>`))+`<div class="btns"><button class="btn" data-dsp="exfil">View all ${EXFIL.length}</button></div>`)}
+ ${panel('Data localisation & residency','Customer data must be processed in India under the RBI storage-of-payment-data directive and your DPDP policy. Select a row for detail.',tbl(['Asset','Data class','Required','Actual','Status'],RESID.map(r=>`<tr data-resid="${r.id}"><td>${esc(r.asset)}</td><td>${esc(r.cls)}</td><td class="mono">${r.req}</td><td class="mono">${r.actual}</td><td>${chip(r.st,r.st==='Compliant'?'ok':r.st==='Review'?'warn':'bad')}</td></tr>`)))}`;
+};
+DSV.surfaces=()=>`${secH('Data surfaces','Where sensitive data appears across AI — prompts, indexes, responses, datasets and logs. Select a surface for its detections and masked samples.')}
+ <div class="cattiles">${SURF.map(s=>`<button class="cattile" data-surf="${s.k}"><span class="v num">${fmtN(s.n)}</span><span class="l">${s.name}</span><span class="s">${s.pats.length} patterns</span></button>`).join('')}</div>
+ ${panel('Surfaces','Sensitive records by surface and the data patterns found on each.',tbl(['Surface','>Records','Top data patterns','Action'],SURF.map(s=>`<tr data-surf="${s.k}"><td>${s.name}</td><td class="r num">${fmtN(s.n)}</td><td class="muted">${s.pats.slice(0,3).join(', ')}</td><td><button class="btn" data-surf="${s.k}">Detections</button></td></tr>`)))}`;
+DSV.exfil=()=>{const byCh=EXCH.map(c=>[c[0],EXFIL.filter(e=>e.chK===c[1]).length]).filter(x=>x[1]);
+ return `${secH('AI data exfiltration','Attempts to move sensitive data out through AI channels — agent tools, shadow AI, RAG, inference APIs and uploads. Select an event for its full log.')}
+ ${kpis([['Exfiltration events',EXFIL.length],['Blocked',EXFIL.filter(e=>e.act==='block').length,'c-crit'],['Redacted',EXFIL.filter(e=>e.act==='redact').length,'c-med'],['Alerted',EXFIL.filter(e=>e.act==='alert').length,'c-high'],['Channels',byCh.length],['Critical',EXFIL.filter(e=>e.sev==='critical').length,'c-crit']])}
+ <div class="grid g12">
+  ${panel('By channel','Exfiltration attempts per AI channel.',`<div class="bars">${byCh.sort((a,b)=>b[1]-a[1]).map(c=>bar(c[0],c[1],byCh[0][1],c[1]+'',c[0].includes('Shadow')?'var(--high)':'var(--blue)')).join('')}</div>`)}
+  ${panel('By action','',`<div class="bars">${[['block','var(--crit)'],['redact','var(--med)'],['alert','var(--high)']].map(a=>bar(a[0],EXFIL.filter(e=>e.act===a[0]).length,EXFIL.length,EXFIL.filter(e=>e.act===a[0]).length+'',a[1])).join('')}</div>`)}
+ </div>
+ ${panel('Exfiltration events','Every attempt, with the channel, data class, volume and enforcement. Select an event for its log.',tbl(['Time','Channel','AI asset / app','What','Data class','Volume','Action'],EXFIL.map(e=>`<tr data-exfil="${e.id}"><td class="mono nowrap">${e.t}</td><td>${esc(e.ch)}</td><td>${esc(e.asset)}</td><td>${esc(e.what)}</td><td class="muted">${esc(e.dcls)}</td><td class="mono nowrap">${esc(e.vol)}</td><td><span class="act act-${e.act}">${e.act}</span></td></tr>`)))}`;
+};
+DSV.protint=()=>`${secH('Protection integrations','DLP, CASB and privacy-vault products that feed classification signals in and enforce protection out. Select one for its configuration and activity.')}
+ ${panel('Integrations',' ',tbl(['Integration','Vendor','Role','Activity','Status'],PROTINT.map(p=>`<tr data-protint="${p.id}"><td>${p.name}</td><td class="muted">${p.vendor}</td><td>${esc(p.role)}</td><td class="mono nowrap">${esc(p.ev)}</td><td>${chip(p.st==='ok'?'Connected':'Not configured',p.st)}</td></tr>`)))}
+ ${panel('How protection integrations work','Signals flow in from DLP, CASB and SWG products; Quilr classifies and decides; enforcement flows back out to the gateway, the privacy vault and the endpoints.',`<div class="list">${[['Signals in','Sensitivity labels (Purview), CASB/SWG logs (Netskope, Zscaler), endpoint DLP verdicts'],['Classify & decide','Quilr DSPM matches data patterns and applies policy'],['Enforce out','Tokenise via Skyflow, block inline via CASB, mask in gateway responses']].map(x=>`<div class="li"><div class="a"><div>${x[0]}</div><div class="sub" style="text-transform:none">${x[1]}</div></div></div>`).join('')}</div>`)}`;
+DSV.residency=()=>`${secH('Data residency & localisation','Customer and payment data must be processed and stored in India under the RBI storage directive and your DPDP policy. Select a row for detail and remediation.')}
+ ${kpis([['Assets in scope',RESID.length],['Compliant',RESID.filter(r=>r.st==='Compliant').length,'c-ok'],['Under review',RESID.filter(r=>r.st==='Review').length,'c-med'],['Violations',RESID.filter(r=>r.st==='Violation').length,'c-crit']])}
+ ${panel('Residency status','Required vs actual processing region for each AI asset holding regulated data.',tbl(['Asset','Data class','Required','Actual','Status'],RESID.map(r=>`<tr data-resid="${r.id}"><td>${esc(r.asset)}</td><td>${esc(r.cls)}</td><td class="mono">${r.req}</td><td class="mono ${r.st==='Violation'?'c-crit':''}">${r.actual}</td><td>${chip(r.st,r.st==='Compliant'?'ok':r.st==='Review'?'warn':'bad')}</td></tr>`)))}`;
+
 /* ---------------- render & events ---------------- */
 function render(){
  const v=VIEWS.find(x=>x.k===state.view)||VIEWS[0];
@@ -2646,7 +2738,7 @@ function render(){
  const on=$('#tabs .tab.on');if(on)on.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function go(k){state.view=k;try{history.replaceState(null,'','#'+k)}catch(e){}closeDrawer();render();window.scrollTo(0,0)}
-const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
+const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
 document.addEventListener('click',e=>{
  const t=e.target.closest(SPEC);
  if(t){const d=t.dataset;
@@ -2705,6 +2797,11 @@ document.addEventListener('click',e=>{
   if(d.mcpe){openMcpEvent(+d.mcpe);return}
   if(d.ctl){const [aid,k,m]=d.ctl.split('|');state.ctl[aid]=state.ctl[aid]||{};state.ctl[aid][k]=m;document.querySelectorAll(`[data-ctl^="${aid}|${k}|"]`).forEach(b=>b.classList.toggle('on',b.dataset.ctl.endsWith('|'+m)));const lab=(CTLS.find(c=>c[0]===k)||[])[1];toast(`${lab}: ${m}`);if(state.view==='threats'&&state.sub.gw==='MCP gateway')render();return}
   if(d.dsp){closeDrawer();state.view='dspm';state.ds.page=d.dsp;state.ds.n=50;state.ds.f=DSF0();if(d.dsp==='posture')state.ds.ik=null;render();window.scrollTo(0,0);return}
+  if(d.surf){openSurface(d.surf);return}
+  if(d.exlog){const [sk,lid]=d.exlog.split('|');openSurfLog(sk,lid);return}
+  if(d.exfil){openExfil(d.exfil);return}
+  if(d.protint){openProtInt(d.protint);return}
+  if(d.resid){openResid(d.resid);return}
   if(d.dsf){const [k,v]=d.dsf.split('|');state.ds.f[k]=state.ds.f[k]===v?'All':v;state.ds.n=50;if(!(state.ds.page in DCAT))state.ds.page='all';render();return}
   if(d.dsgo){closeDrawer();state.ds.f=DSF0();d.dsgo.split(';').forEach(x=>{const [k,v]=x.split('|');state.ds.f[k]=v});state.ds.n=50;state.view='dspm';state.ds.page='all';render();window.scrollTo(0,0);return}
   if(d.dsa){openDsAsset(d.dsa,+(d.dstab||0));return}
