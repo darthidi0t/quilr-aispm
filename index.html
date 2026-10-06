@@ -859,7 +859,7 @@ V.model=()=>{
 
  if(sub==='Overview')return `${top}
  <div class="grid g21">
-  ${panel('Prediction drift (PSI)','Population stability index against the approved baseline, last 14 days.',lineChart([{n:'llama-3.1-8b-collections-ft',c:'var(--high)',v:[.08,.09,.11,.1,.13,.15,.14,.18,.21,.2,.24,.27,.29,.31]},{n:'credit-pd-xgb-v11',c:'var(--med)',v:[.06,.07,.09,.1,.12,.14,.16,.19,.2,.22,.23,.25,.26,.27]},{n:'credit-pd-xgb-v12',c:'var(--accent)',v:[.04,.05,.04,.05,.06,.05,.06,.05,.07,.06,.06,.07,.06,.07]}],d,{th:.25,thLabel:'alert 0.25',max:.4,area:false,label:'drift chart'}))}
+  ${driftPanel()}
   ${panel('Abnormal behaviour','Deviations from each model’s behavioural baseline.',`<div class="list">${[['Refusal rate up 3.4×','HR Policy Q&A · since 2 Oct','medium'],['Output length +180%','Wealth Advisor Bot · 24h','medium'],['Toxicity score p99 above baseline','SDR Outreach Agent · 6h','high'],['Token spend 5.1× daily mean','gpt-4o-prod-eus2 · 3h','high'],['Hallucination rate 7.2% (baseline 2.1%)','Loan Underwriting Copilot · 7d','high']].map(r=>`<div class="li"><div class="a"><div>${r[0]}</div><div class="sub" style="text-transform:none">${r[1]}</div></div>${pill(r[2])}</div>`).join('')}</div>`)}
  </div>
  ${registry}
@@ -3115,6 +3115,105 @@ function modelTheftView(){
  ${panel('Watermark & canary monitoring','Statistical watermarks on generated output and canary input/response pairs let us recognise our own model when it turns up somewhere else.',`<div class="list">${[['Output watermarking','3 of 6 LLM deployments carry a statistical watermark','partial'],['Canary input/response pairs','4 models seeded with canary pairs replayed weekly against third-party services','on'],['External sweep','Public paste sites and third-party scoring APIs swept daily','on'],['Hash & provenance registry','Every registered artifact hashed and re-verified on load','on'],['Confidence masking','Raw confidence withheld from external callers on 9 of 14 models','partial']].map(r=>`<div class="li"><div class="a"><div>${r[0]}</div><div class="sub" style="text-transform:none">${esc(r[1])}</div></div>${chip(r[2],r[2]==='on'?'ok':'warn')}</div>`).join('')}</div>`)}`;
 }
 
+/* ---------------- Prediction drift (PSI) — computed, with evidence ---------------- */
+/* PSI = SUM over bins of (actual% - expected%) * ln(actual% / expected%).
+   Baseline deciles are cut so each holds exactly 10% of the approved baseline population,
+   so expected% is 0.10 in every bin and the table below sums to the reported PSI. */
+const PSI_E=0.10;
+const psiContrib=a=>(a-PSI_E)*Math.log(a/PSI_E);
+const psiOf=cur=>cur.reduce((s,a)=>s+psiContrib(a),0);
+const psiBand=v=>v>=0.25?['Significant shift','bad','critical']:v>=0.10?['Moderate shift','warn','medium']:['Stable','ok','low'];
+const DRIFT=[
+ {mk:'m3',metric:'Output score distribution (collections propensity)',unit:'score',
+  base:{n:'collections-baseline-2026Q2',win:'01 Apr – 30 Jun 2026',N:412880,appr:'04 Jul 2026 · model-risk'},
+  cur:{win:'22 Sep – 05 Oct 2026',N:61204},
+  dist:[.025,.035,.05,.07,.08,.11,.13,.15,.17,.18],
+  feats:[['call_duration_sec','PSI 0.21 · KS 0.18','p < 0.001','Mean 214 s → 338 s after the new dialler rollout','high'],['language_mix_hi','PSI 0.17 · KS 0.14','p < 0.001','Hindi-language calls 22% → 41%','high'],['days_past_due','PSI 0.09 · KS 0.07','p = 0.004','Bucket mix shifted toward 30–60 days','medium'],['prompt_tokens','PSI 0.06 · KS 0.05','p = 0.02','Longer transcripts fed to the model','low']],
+  cause:'A new dialler rolled out on 24 Sep changed call length and language mix, shifting the input distribution the fine-tune was trained on.',
+  action:'Retrain queued · model-risk review 08 Oct',own:'collections-ds'},
+ {mk:'m11',metric:'Probability-of-default score distribution',unit:'PD score',
+  base:{n:'credit-pd-baseline-v11',win:'01 Jan – 31 Mar 2026',N:286400,appr:'12 Apr 2026 · model-risk'},
+  cur:{win:'22 Sep – 05 Oct 2026',N:38960},
+  dist:[.03,.045,.055,.07,.085,.11,.125,.15,.165,.165],
+  feats:[['applicant_income','PSI 0.14 · KS 0.12','p < 0.001','Median income up 11% in the scored population','high'],['bureau_score','PSI 0.11 · KS 0.09','p < 0.001','Thin-file applicants up 6 pts','high'],['employment_type','PSI 0.07 · KS 0.06','p = 0.008','Self-employed share 18% → 25%','medium'],['loan_tenure_m','PSI 0.03 · KS 0.03','p = 0.11','No material change','low']],
+  cause:'v11 is still scoring a batch job after v12 took production traffic, so it now sees an unrepresentative slice of applicants.',
+  action:'Decommission v11 batch path · owner notified',own:'model-risk'},
+ {mk:'m2',metric:'Fraud score distribution',unit:'fraud score',
+  base:{n:'fraud-baseline-2026Q2',win:'01 Apr – 30 Jun 2026',N:1940000,appr:'08 Jul 2026 · fraud-ds'},
+  cur:{win:'22 Sep – 05 Oct 2026',N:412300},
+  dist:[.04,.05,.06,.07,.09,.11,.12,.14,.16,.16],
+  feats:[['merchant_category','PSI 0.12 · KS 0.10','p < 0.001','New partner merchant feed added 18 Sep','high'],['txn_amount','PSI 0.08 · KS 0.07','p = 0.002','Festive-season ticket sizes up','medium'],['device_trust','PSI 0.04 · KS 0.04','p = 0.07','Within tolerance','low']],
+  cause:'A new partner merchant feed widened the transaction mix; also the corpus flagged for label flipping (POI-001).',
+  action:'Monitor · recheck after the poisoned shard is removed',own:'fraud-ds'},
+ {mk:'m7',metric:'Output score distribution',unit:'score',
+  base:{n:'mistral-eval-baseline',win:'01 Aug – 31 Aug 2026',N:48200,appr:'05 Sep 2026 · ai-platform'},
+  cur:{win:'22 Sep – 05 Oct 2026',N:6140},
+  dist:[.05,.06,.07,.085,.095,.105,.115,.13,.14,.15],
+  feats:[['prompt_topic_cluster','PSI 0.09 · KS 0.08','p = 0.003','Research prompts shifted toward summarisation','medium'],['prompt_tokens','PSI 0.05 · KS 0.04','p = 0.04','Longer inputs','low']],
+  cause:'Staging traffic only; the artifact is quarantined for tampered weights (see Integrity).',
+  action:'No action — model quarantined',own:'ai-platform'},
+ {mk:'m1',metric:'Probability-of-default score distribution',unit:'PD score',
+  base:{n:'credit-pd-baseline-v12',win:'01 May – 31 Jul 2026',N:508200,appr:'09 Aug 2026 · model-risk'},
+  cur:{win:'22 Sep – 05 Oct 2026',N:94120},
+  dist:[.06,.07,.08,.09,.095,.105,.11,.12,.13,.14],
+  feats:[['applicant_income','PSI 0.04 · KS 0.04','p = 0.09','Within tolerance','low'],['bureau_score','PSI 0.03 · KS 0.03','p = 0.21','No material change','low']],
+  cause:'Normal seasonal variation; no retraining required.',
+  action:'None — within tolerance',own:'model-risk'},
+ {mk:'m10',metric:'Output score distribution',unit:'score',
+  base:{n:'gemma-eval-baseline',win:'01 Sep – 20 Sep 2026',N:22400,appr:'22 Sep 2026 · ai-platform'},
+  cur:{win:'22 Sep – 05 Oct 2026',N:4880},
+  dist:[.075,.08,.09,.095,.10,.105,.11,.115,.115,.115],
+  feats:[['prompt_topic_cluster','PSI 0.02 · KS 0.02','p = 0.42','No material change','low']],
+  cause:'Internal eval baseline only.',
+  action:'None',own:'ai-platform'}
+].map(d=>{const psi=psiOf(d.dist);
+ const H=x=>{let h=2166136261;for(let i=0;i<x.length;i++){h^=x.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};
+ const series=Array.from({length:14},(_,i)=>{const t=i/13,wob=((H(d.mk+'s'+i)%100)/100-.5)*psi*0.07;return Math.max(0.01,+(psi*(0.40+0.60*t)+wob).toFixed(3))});
+ series[13]=+psi.toFixed(3);
+ return Object.assign({psi,series},d)});
+/* the registry, KPIs and chart all read the same computed number */
+DRIFT.forEach(d=>{const m=MODELS.find(x=>x.id===d.mk);if(m)m.drift=+d.psi.toFixed(2)});
+const driftOf=mk=>DRIFT.find(d=>d.mk===mk);
+const DBINS=['0–10%','10–20%','20–30%','30–40%','40–50%','50–60%','60–70%','70–80%','80–90%','90–100%'];
+
+function openDrift(mk){const d=driftOf(mk);if(!d)return;const m=MODELS.find(x=>x.id===mk);const band=psiBand(d.psi);
+ const rows=d.dist.map((a,i)=>{const diff=a-PSI_E,lr=Math.log(a/PSI_E),c=diff*lr;
+  return `<tr><td class="mono">${i+1}</td><td class="mono nowrap">${DBINS[i]}</td><td class="r mono">${(PSI_E*100).toFixed(1)}%</td><td class="r mono">${(a*100).toFixed(1)}%</td><td class="r mono ${diff<0?'c-med':diff>0?'c-ok':''}">${diff>0?'+':''}${(diff*100).toFixed(1)} pp</td><td class="r mono">${lr.toFixed(4)}</td><td class="r mono" style="color:${c>0.03?'var(--high)':'inherit'}">${c.toFixed(4)}</td></tr>`});
+ rows.push(`<tr style="border-top:1px solid var(--line-2)"><td colspan="6" class="r" style="font-weight:600">PSI total</td><td class="r mono" style="font-weight:700;color:${band[1]==='bad'?'var(--crit)':band[1]==='warn'?'var(--med)':'var(--ok)'}">${d.psi.toFixed(4)}</td></tr>`);
+ const maxp=Math.max(...d.dist,PSI_E);
+ const distViz=d.dist.map((a,i)=>`<div style="display:grid;grid-template-columns:66px 1fr 58px;gap:8px;align-items:center;padding:3px 0">
+   <span class="mono" style="font-size:11px;color:var(--muted)">${DBINS[i]}</span>
+   <div style="display:grid;gap:3px">
+    <div class="track" style="height:6px"><div class="fill" style="width:${PSI_E/maxp*100}%;background:var(--line-2)"></div></div>
+    <div class="track" style="height:6px"><div class="fill" style="width:${a/maxp*100}%;background:${a>PSI_E?'var(--high)':'var(--blue)'}"></div></div>
+   </div>
+   <span class="mono r" style="font-size:11px;color:${a>PSI_E?'var(--high)':'var(--muted)'}">${(a*100).toFixed(1)}%</span></div>`).join('');
+ drawer(`${dhead('Prediction drift · PSI',esc(m?m.n:mk))}
+ <div class="meta">${chip(band[0],band[1])}<span class="lbl">PSI</span><b class="num" style="color:${band[1]==='bad'?'var(--crit)':band[1]==='warn'?'var(--med)':'var(--ok)'}">${d.psi.toFixed(3)}</b><span class="lbl">Alert at</span><span class="mono">0.25</span><span class="lbl">Metric</span><span>${esc(d.metric)}</span></div>
+ <p style="margin:0">${esc(d.cause)}</p>
+ ${panes([
+  ['Overview',`<dl class="kv"><dt>Model</dt><dd class="mono">${esc(m?m.n:mk)}</dd><dt>Metric</dt><dd>${esc(d.metric)}</dd><dt>Baseline</dt><dd class="mono">${d.base.n}</dd><dt>Baseline window</dt><dd>${d.base.win} · <span class="num">${fmt(d.base.N)}</span> scored records</dd><dt>Baseline approved</dt><dd>${d.base.appr}</dd><dt>Current window</dt><dd>${d.cur.win} · <span class="num">${fmt(d.cur.N)}</span> scored records</dd><dt>PSI</dt><dd class="num">${d.psi.toFixed(4)}</dd><dt>Band</dt><dd>${chip(band[0],band[1])}</dd><dt>Action</dt><dd>${esc(d.action)}</dd><dt>Owner</dt><dd class="mono">${d.own}</dd><dt>Computed</dt><dd>every 6 hours by the drift job · last run 05 Oct 10:00</dd></dl>
+   ${panel('How the band is set',' ',`<div class="list">${[['PSI < 0.10','Stable — no action','ok'],['0.10 – 0.25','Moderate shift — investigate, keep serving','warn'],['PSI ≥ 0.25','Significant shift — alert, retrain or roll back','bad']].map(r=>`<div class="li"><div class="a"><div class="mono">${r[0]}</div><div class="sub" style="text-transform:none">${r[1]}</div></div>${d.psi>=0.25&&r[2]==='bad'||d.psi>=0.10&&d.psi<0.25&&r[2]==='warn'||d.psi<0.10&&r[2]==='ok'?chip('this model','info'):''}</div>`).join('')}</div>`)}`],
+  ['How it is calculated',`${jbox('Population Stability Index','PSI = Σ over bins  ( actual% − expected% ) × ln( actual% / expected% )\n\nexpected%  baseline share of the bin\nactual%    current share of the same bin\n\nBins are the baseline score deciles: cut points are taken from the\napproved baseline so each bin holds exactly 10% of it. Expected% is\ntherefore 0.100 in every bin, and the contributions below sum to PSI.\nEmpty current bins are floored at 0.0001 before the log.')}
+   <p class="muted" style="margin:10px 0 8px">Every row is one baseline decile of ${esc(d.metric.toLowerCase())}. The contribution column is the term each bin adds to the total.</p>
+   ${tbl(['Bin','Baseline score range','>Expected %','>Actual %','>Difference','>ln(actual/expected)','>Contribution'],rows)}
+   <p class="dim" style="font-size:11.5px;margin:10px 0 0">Baseline ${fmt(d.base.N)} records (${d.base.win}) · current ${fmt(d.cur.N)} records (${d.cur.win}). Totals may differ from the sum of the rounded columns by less than 0.0001.</p>`],
+  ['Distribution shift',`<p class="muted" style="margin:0 0 10px">Grey is the approved baseline (10% per decile by construction); coloured is the current window. Red bins hold more of the population than the baseline did.</p>${distViz}
+   <p class="dim" style="font-size:11.5px;margin:12px 0 0">The mass has moved toward the upper deciles, which is what pushes the PSI above the alert threshold.</p>`],
+  [`Feature drift (${d.feats.length})`,tbl(['Feature','Drift statistic','Significance','What changed','Impact'],d.feats.map(f=>`<tr><td class="mono">${f[0]}</td><td class="mono">${f[1]}</td><td class="mono">${f[2]}</td><td class="muted">${esc(f[3])}</td><td>${pill(f[4])}</td></tr>`))+`<p class="dim" style="font-size:11.5px;margin:10px 0 0">Per-feature PSI uses the same formula on that feature's baseline deciles. KS is the two-sample Kolmogorov–Smirnov statistic; p-values are from the same test.</p>`],
+  ['Evidence',jbox('quilr.model.drift/v1',{model:m?m.n:mk,metric:d.metric,method:'population_stability_index',binning:'baseline_deciles',bins:10,expected_share_per_bin:PSI_E,baseline:{dataset:d.base.n,window:d.base.win,records:d.base.N,approved:d.base.appr},current:{window:d.cur.win,records:d.cur.N},actual_shares:d.dist,contributions:d.dist.map(a=>+psiContrib(a).toFixed(5)),psi:+d.psi.toFixed(4),band:band[0].toLowerCase(),alert_threshold:0.25,top_feature_drift:d.feats.map(f=>({feature:f[0],statistic:f[1],significance:f[2]})),job:'drift-job-'+mk+'-20261005T1000Z',schedule:'every 6h',engine:'quilr-model-monitor'})]])}
+ <div class="btns">${m?`<button class="btn" data-msec="${m.id}">Open model profile</button>`:''}<button class="btn pri" data-toast="Retrain request raised for ${esc(m?m.n:mk)}">Request retrain</button></div>`,true)}
+
+function driftPanel(){const d14=days(14);
+ const shown=DRIFT.slice().sort((a,b)=>b.psi-a.psi).slice(0,3);
+ const cols=['var(--high)','var(--med)','var(--accent)'];
+ const chart=lineChart(shown.map((d,i)=>{const m=MODELS.find(x=>x.id===d.mk);return {n:m?m.n:d.mk,c:cols[i],v:d.series}}),d14,{th:.25,thLabel:'alert 0.25',max:Math.max(.4,...DRIFT.map(d=>d.psi))+.05,area:false,label:'drift chart'});
+ const list=DRIFT.slice().sort((a,b)=>b.psi-a.psi).map(d=>{const m=MODELS.find(x=>x.id===d.mk),band=psiBand(d.psi);
+  return `<div class="li clickable" data-drift="${d.mk}"><div class="a"><div>${esc(m?m.n:d.mk)}</div><div class="sub" style="text-transform:none">${esc(d.metric)} · baseline ${d.base.n} · ${fmt(d.cur.N)} records scored</div></div><span class="mono" style="color:${band[1]==='bad'?'var(--crit)':band[1]==='warn'?'var(--med)':'var(--ok)'};font-weight:600;margin-right:8px">${d.psi.toFixed(3)}</span>${chip(band[0],band[1])}</div>`}).join('');
+ return panel('Prediction drift (PSI)','Population stability index of each model’s score distribution against its approved baseline, last 14 days. Select a model to see the decile table the PSI is computed from.',
+  chart+`<div class="meta" style="margin-top:10px"><span class="lbl">Bands</span><span class="mono" style="color:var(--ok)">&lt; 0.10 stable</span><span class="mono" style="color:var(--med)">0.10–0.25 moderate</span><span class="mono" style="color:var(--crit)">≥ 0.25 significant</span><span class="lbl" style="margin-left:auto">PSI = Σ (actual% − expected%) × ln(actual% / expected%)</span></div><div class="list" style="margin-top:8px">${list}</div>`);
+}
+
 /* ---------------- render & events ---------------- */
 function render(){
  const v=VIEWS.find(x=>x.k===state.view)||VIEWS[0];
@@ -3129,7 +3228,7 @@ function render(){
  const on=$('#tabs .tab.on');if(on)on.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function go(k){state.view=k;try{history.replaceState(null,'','#'+k)}catch(e){}closeDrawer();render();window.scrollTo(0,0)}
-const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-theft],[data-expo],[data-adv],[data-pois],[data-poisds],[data-det],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
+const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-drift],[data-theft],[data-expo],[data-adv],[data-pois],[data-poisds],[data-det],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
 document.addEventListener('click',e=>{
  const t=e.target.closest(SPEC);
  if(t){const d=t.dataset;
@@ -3172,6 +3271,7 @@ document.addEventListener('click',e=>{
   if(d.ptpack){const pk=PTPL.find(x=>x[1]===d.ptpack);let n=0;pk[2].forEach(t=>{if(t[2]&&POL.some(p=>p.id===t[2]))return;const w=pwDefault(tplPrefill(t).type,tplPrefill(t));const id='QP-'+(Math.max(...POL.map(p=>parseInt(p.id.slice(3))||0))+1);POL.push({id,n:t[0],cat:t[1],act:w.act,mode:'Monitor',sev:w.sev,fw:[pk[0]],rule:pwRule(w),desc:'Installed from the '+pk[0]+' template pack. Review matches before switching to Enforce.',owner:'you',upd:'05 Oct 2026',ver:1,hits:0});t[2]=id;n++});
    PAUD.unshift(['05 Oct '+new Date().toTimeString().slice(0,5),'you',pk[0],'Installed '+n+(n===1?' template':' templates')+' in Monitor mode']);render();DST.pop();openTemplates();toast(n+(n===1?' policy':' policies')+' added from '+pk[0]+' in Monitor mode');return}
   if(d.pwfrom){const p=POL.find(x=>x.id===d.pwfrom);openWizard({type:p.cat==='gov'?'runtime':p.cat,name:p.n+' (copy)',act:p.act,sev:p.sev});return}
+  if(d.drift){openDrift(d.drift);return}
   if(d.theft){openTheft(d.theft);return}
   if(d.expo){openExposure(d.expo);return}
   if(d.adv){openAdv(d.adv);return}
