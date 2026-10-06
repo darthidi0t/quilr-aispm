@@ -3214,6 +3214,135 @@ function driftPanel(){const d14=days(14);
   chart+`<div class="meta" style="margin-top:10px"><span class="lbl">Bands</span><span class="mono" style="color:var(--ok)">&lt; 0.10 stable</span><span class="mono" style="color:var(--med)">0.10–0.25 moderate</span><span class="mono" style="color:var(--crit)">≥ 0.25 significant</span><span class="lbl" style="margin-left:auto">PSI = Σ (actual% − expected%) × ln(actual% / expected%)</span></div><div class="list" style="margin-top:8px">${list}</div>`);
 }
 
+/* ---------------- OWASP LLM Top 10 · attack techniques behind each tile ---------------- */
+const OWATK={
+ LLM01:[['direct','Direct instruction override','Tells the model to ignore its instructions and follow the attacker’s instead.','AML.T0051'],
+  ['indirect','Indirect injection via retrieved content','Hides instructions inside a document, page or ticket the model will retrieve and read as context.','AML.T0051'],
+  ['suffix','Adversarial suffix (GCG)','Appends a gradient-crafted token string that forces the model past its refusal behaviour.','AML.T0054'],
+  ['crescendo','Multi-turn crescendo','Builds up harmless turns, then pivots — each turn alone looks benign to a single-turn classifier.','AML.T0054'],
+  ['encoding','Encoding and obfuscation bypass','Hides the payload in base64, homoglyphs or zero-width characters so the inspector misses it.','AML.T0054'],
+  ['toolmeta','Tool-description injection','Puts instructions in tool metadata so the agent reads them while choosing a tool.','AML.T0053'],
+  ['transfer','Transfer attack from an open model','Crafts the attack against an open copy of the model, then replays it at the production one.','AML.T0043']],
+ LLM02:[['pii_resp','PII in model response','Steers the model into returning personal data about someone other than the requester.','AML.T0057'],
+  ['memorise','Training-data memorisation extraction','Prompts the model to reproduce verbatim records it memorised during fine-tuning.','AML.T0024'],
+  ['overbroad','Over-broad retrieval','Asks a question whose retrieval returns records the user is not entitled to.','AML.T0057'],
+  ['secret_echo','Secret echoed from context','Gets the model to repeat a key or token that was placed in its context.','AML.T0057'],
+  ['transcript','Transcript and log leakage','Recovers sensitive values from stored transcripts or tool logs.','AML.T0057']],
+ LLM03:[['unsafe_serial','Unsafe serialization (pickle / joblib)','Ships weights that execute code the moment they are deserialized.','AML.T0010'],
+  ['lambda_layer','Executable layer in a saved model','Embeds arbitrary code in a Keras Lambda or custom layer that runs on load.','AML.T0011'],
+  ['provenance','Unverified provenance / hash mismatch','Substitutes an artifact whose hash does not match the vendor attestation.','AML.T0010'],
+  ['mirror','Compromised or typosquatted mirror','Serves a tampered artifact from a lookalike registry or mirror.','AML.T0010'],
+  ['dep_cve','Vulnerable ML dependency','Exploits a known CVE in the serving stack to reach the model host.','AML.T0010']],
+ LLM04:[['label_flip','Label flipping','Flips labels in an ingest shard so the model learns the wrong decision boundary.','AML.T0020'],
+  ['clean_backdoor','Clean-label backdoor','Adds correctly-labelled samples carrying a shared trigger that activates later.','AML.T0020'],
+  ['feedback','Feedback-loop poisoning','Games thumbs-up / thumbs-down signals to pull the model toward unsafe answers.','AML.T0020'],
+  ['unattested','Unattested training corpus','Feeds the model data with no signed provenance, so tampering cannot be ruled out.','AML.T0020'],
+  ['dup_skew','Near-duplicate amplification','Floods the set with near-duplicates to skew the learned distribution.','AML.T0020']],
+ LLM05:[['unescaped','Unescaped output rendered as markup','Model output containing HTML or script is rendered in a console or email client.','AML.T0011'],
+  ['tool_passthrough','Output passed to a tool unvalidated','Model output is used as tool arguments with no schema or value checks.','AML.T0011'],
+  ['sql_build','Query or command built from output','Model output is concatenated into SQL or a shell command.','AML.T0011'],
+  ['url_emit','Unvalidated link emitted','Model emits an attacker-controlled URL that a person or system then follows.','AML.T0011']],
+ LLM06:[['no_approval','Write action without human approval','Agent invokes a create/update/delete tool with no approver in the loop.','AML.T0053'],
+  ['scope_creep','Tool scope beyond the task','Agent holds tools and permissions far wider than the job it was built for.','AML.T0053'],
+  ['bulk_retrieval','Bulk or broad data retrieval','Agent is steered into pulling whole datasets rather than one record.','AML.T0057'],
+  ['chained_send','Chained tool calls reaching an external send','A restricted read is followed by an outbound send in the same agent run.','AML.T0057'],
+  ['shared_identity','Shared or over-privileged identity','Several agents share one powerful identity, so actions cannot be attributed or scoped.','AML.T0053']],
+ LLM07:[['repeat_above','“Repeat the text above”','Asks the model to echo everything before the user turn, dumping the system prompt.','AML.T0056'],
+  ['roleplay_reveal','Role-play framing','Wraps the request in a game or persona so revealing instructions feels in-character.','AML.T0056'],
+  ['delimiter','Delimiter and format confusion','Breaks the prompt template with crafted delimiters so the context spills into the answer.','AML.T0056'],
+  ['error_leak','Error-message leakage','Forces an error whose message includes the prompt or configuration.','AML.T0056']],
+ LLM08:[['cross_tenant','Cross-tenant retrieval','Retrieves chunks belonging to another customer because the index has no ACL filter.','AML.T0057'],
+  ['inversion','Embedding inversion','Reconstructs source text from the embedding vectors themselves.','AML.T0024'],
+  ['collision','Embedding collision','Crafts input that collides with a high-value chunk to hijack what gets retrieved.','AML.T0043'],
+  ['index_poison','Index poisoning via upload','Gets malicious content indexed so it is retrieved as trusted context.','AML.T0020']],
+ LLM09:[['ungrounded','Ungrounded answer','Model answers confidently with no supporting source in the retrieved context.','—'],
+  ['fab_citation','Fabricated citation','Model invents a source, policy clause or figure that does not exist.','—'],
+  ['overconfident','Overconfident advice out of scope','Model gives regulated advice it was never approved to give.','—']],
+ LLM10:[['query_volume','High-volume query extraction','Burns through queries to clone the decision boundary or harvest outputs.','AML.T0024'],
+  ['token_flood','Token flood / cost harvesting','Drives cost and latency with oversized or repeated requests.','AML.T0029'],
+  ['no_budget','No per-identity query budget','No budget or rate ceiling exists, so abuse has nothing to hit.','AML.T0029'],
+  ['recursive_loop','Recursive agent loop','Agent calls itself or its tools without a depth or spend ceiling.','AML.T0029']]};
+/* [code, model, technique, tested, failed, last run, control that should stop it, why it did not, evidence] */
+const OWFAIL=[
+ ['LLM01','m3','indirect',120,14,'29 Sep','Injection shield v3.8.2 (input stage)','Only the user prompt is inspected for this model — the retrieval stage is not routed through the gateway.','RT-214'],
+ ['LLM01','m3','crescendo',60,9,'29 Sep','Multi-turn context analysis','Context-window analysis is off for fine-tuned models, so each turn is judged alone.','RT-214'],
+ ['LLM01','m3','transfer',61,8,'22 Sep','Adversarial-suffix classifier v3.8.1','Attack crafted against the open Llama base transfers to the fine-tune; signatures only cover hosted models.','ADV-008'],
+ ['LLM01','m4','suffix',80,7,'22 Sep','Adversarial-suffix classifier v3.8.1','Classifier is one version behind; the new suffix family is not in the signature set.','ADV-003'],
+ ['LLM01','m4','encoding',60,4,'22 Sep','Normalisation before inspection','Zero-width and homoglyph variants are not normalised before the classifier runs.',''],
+ ['LLM01','m6','direct',240,11,'22 Sep','Injection shield v3.8.2','Grounding calls go straight from Vertex to the source, bypassing the gateway entirely.','RT-211'],
+ ['LLM01','m6','indirect',90,8,'22 Sep','Retrieval content scan','Grounding sources are fetched by Vertex, so the gateway never sees the retrieved text.','RT-211'],
+ ['LLM01','m14','suffix',40,5,'18 Sep','Adversarial-suffix classifier','The SaaS hook inspects the final draft only, not intermediate reasoning turns.','ADV-014'],
+ ['LLM01','m14','toolmeta',30,3,'18 Sep','Tool description pinning (QP-24)','Agentforce tool metadata is not covered by the pinning policy.','RT-208,QP-24'],
+ ['LLM02','m3','memorise',150,12,'29 Sep','Output DLP (QP-02)','The fine-tune memorised debtor names from call logs; DLP only matches structured patterns, not names in prose.','RT-214'],
+ ['LLM02','m4','pii_resp',200,6,'22 Sep','Output DLP (QP-02)','Free-text addresses score below the pattern-confidence threshold.','QP-02'],
+ ['LLM02','m5','overbroad',120,4,'11 Sep','Retrieval ACL filter','The KYC index returns sibling records when the applicant ID is partial.','RT-205'],
+ ['LLM02','m13','transcript',90,7,'—','ASR output redaction','Account numbers spoken as individual digits are not masked before the transcript is stored.',''],
+ ['LLM03','m7','unsafe_serial',1,1,'04 Oct','Pre-registration artifact scanner','The artifact was pulled from an unverified mirror before the scan gate ran.','POI-005'],
+ ['LLM03','m7','provenance',1,1,'04 Oct','Sigstore / vendor attestation check','Registered hash does not match the vendor attestation — mirror served a tampered file.','POI-005'],
+ ['LLM03','m8','unsafe_serial',1,1,'01 Oct','Pre-registration artifact scanner','Third-party joblib checkpoint opens a socket on load; it was registered before scanning was mandatory.','POI-014'],
+ ['LLM03','m9','lambda_layer',1,1,'03 Oct','Keras custom-layer scan','Lambda layer executes arbitrary Python at load; the scanner covered pickle only when this was registered.',''],
+ ['LLM04','m2','label_flip',12,2,'05 Oct','Label-consistency check on ingest','Check runs after the shard is merged, so a poisoned batch reaches the training set first.','POI-001,POI-010'],
+ ['LLM04','m2','unattested',12,12,'05 Oct','Provenance attestation on ingest','The partner merchant feed carries no signed provenance record, so tampering cannot be ruled out.','POI-001'],
+ ['LLM05','m5','tool_passthrough',80,3,'11 Sep','Tool argument schema validation','Extracted KYC fields are passed to the downstream tool without value-level checks.','RT-205'],
+ ['LLM05','m14','unescaped',60,5,'18 Sep','Output encoding in the agent console','Model output is rendered as rich text, so emitted markup is interpreted rather than escaped.','RT-208'],
+ ['LLM05','m14','url_emit',40,4,'18 Sep','Link allow-list on outbound drafts','Drafted emails may contain any URL the model produces.',''],
+ ['LLM06','m3','bulk_retrieval',100,9,'29 Sep','Bulk-request guard (QP-12)','Guard matches explicit “all customers” phrasing; paraphrased bulk requests get through.','QP-12'],
+ ['LLM06','m6','scope_creep',50,6,'22 Sep','Tool scope enforcement (QP-21)','The Vertex agent is not behind the MCP gateway, so scope is never checked at call time.','QP-21'],
+ ['LLM06','m6','shared_identity',1,1,'22 Sep','Per-agent identity','sa-wealth-advisor holds roles/editor plus CRM write and is shared across jobs.','QP-20'],
+ ['LLM06','m14','no_approval',60,7,'18 Sep','Human approval for write tools (QP-03)','The refund tool was coaxed past approval by re-framing it as a correction.','RT-208,QP-03'],
+ ['LLM06','m14','chained_send',40,2,'18 Sep','Restricted-read-then-send sequence rule (QP-26)','Sequence rule has a 2-minute span; the agent split the steps across a longer run.','QP-26'],
+ ['LLM07','m4','repeat_above',120,9,'22 Sep','Prompt-leakage detector','Detector threshold is 0.80; crafted variants score 0.72–0.79 and pass.','RT-211,QP-08'],
+ ['LLM07','m4','roleplay_reveal',80,5,'22 Sep','Prompt-leakage detector','Role-play framing is scored as creative writing rather than extraction.','QP-08'],
+ ['LLM07','m4','error_leak',40,2,'22 Sep','Error sanitisation','Upstream provider errors are returned verbatim and include the system preamble.',''],
+ ['LLM08','m12','cross_tenant',200,6,'04 Sep','Retrieval ACL filter','The index was built without per-record ACL metadata, so filtering happens after retrieval.','POI-004'],
+ ['LLM08','m12','inversion',9400,1,'04 Sep','Embedding API rate and budget','No per-identity budget on the embedding endpoint; 9,400 queries ran unthrottled.','ADV-005'],
+ ['LLM08','m12','collision',310,1,'04 Sep','Retrieval anomaly detection','Collision inputs score as ordinary queries; only post-hoc clustering caught them.','ADV-010'],
+ ['LLM09','m6','ungrounded',300,23,'22 Sep','Grounding / hallucination detector v3.8.1','Detector true-positive rate is 84.2% — the weakest in the fleet — and it is advisory, not blocking.',''],
+ ['LLM09','m6','fab_citation',150,11,'22 Sep','Citation verification against the index','Citations are checked for format, not for existence in the retrieved set.',''],
+ ['LLM10','m1','no_budget',1,1,'05 Oct','Per-identity query budget','No budget configured on the scoring endpoint.',''],
+ ['LLM10','m2','query_volume',6000,1,'05 Oct','Query-pattern analysis','Detected only after 6,000 queries had already been answered.','ADV-001,MT-001'],
+ ['LLM10','m2','no_budget',1,1,'05 Oct','Per-identity query budget','Batch scoring identities are exempt from the budget policy.',''],
+ ['LLM10','m11','query_volume',980,1,'05 Oct','Query-pattern analysis','Shadow batch path is not rate-shaped.','ADV-017'],
+ ['LLM10','m11','no_budget',1,1,'05 Oct','Per-identity query budget','The decommissioned v11 batch path was never added to the budget policy.','']
+].map(r=>({code:r[0],mk:r[1],tech:r[2],tested:r[3],failed:r[4],last:r[5],ctl:r[6],gap:r[7],ev:r[8]?r[8].split(','):[]}));
+const owTechMeta=(code,tid)=>(OWATK[code]||[]).find(t=>t[0]===tid)||[tid,tid,'',''];
+const owFailFor=code=>OWFAIL.filter(f=>f.code===code);
+const owTechsFailing=code=>[...new Set(owFailFor(code).map(f=>f.tech))];
+const owModelsFailing=code=>[...new Set(owFailFor(code).map(f=>f.mk))];
+const owRate=f=>f.tested?f.failed/f.tested:0;
+const owRateTxt=f=>f.tested===1?(f.failed?'fails':'passes'):(owRate(f)*100).toFixed(1)+'%';
+function evChip(r){const t=r.trim();
+ if(/^ADV-/.test(t))return `<span class="tag clickable" data-adv="${t}">${t}</span>`;
+ if(/^POI-/.test(t))return `<span class="tag clickable" data-pois="${t}">${t}</span>`;
+ if(/^MT-/.test(t))return `<span class="tag clickable" data-theft="${t}">${t}</span>`;
+ if(/^QP-/.test(t))return `<span class="tag clickable" data-pol2="${t}">${t}</span>`;
+ return `<span class="tag">${t}</span>`;}
+
+function openOwTech(key){const [code,tid]=key.split('|');const t=owTechMeta(code,tid),o=OW.find(x=>x[0]===code);
+ const rows=owFailFor(code).filter(f=>f.tech===tid);
+ drawer(`${dhead('Attack technique · '+code,esc(t[1]))}
+ <div class="meta">${pill(o?o[2]:'medium')}<span class="tag">${code} ${esc(o?o[1]:'')}</span>${t[3]&&t[3]!=='—'?`<span class="lbl">ATLAS</span><span style="color:var(--fg)">${t[3]}</span>`:''}<span class="lbl">Models failing</span><b class="num c-crit">${rows.length}</b></div>
+ <p style="margin:0"><b>What the attacker does.</b> ${esc(t[2])}</p>
+ ${panel('Where it is failing','Each row is one model that this technique got through, with the control that should have stopped it and why it did not. Select a model to open its profile.',tbl(['Model','>Tested','>Bypassed','Success rate','Last run','Control that should stop it','Why it did not','Evidence'],rows.map(f=>{const m=MODELS.find(x=>x.id===f.mk);return `<tr data-msec="${f.mk}"><td class="mono">${esc(m?m.n:f.mk)}</td><td class="r num">${fmt(f.tested)}</td><td class="r num c-high">${f.failed}</td><td class="r mono" style="color:${owRate(f)>0.08?'var(--crit)':'var(--med)'}">${owRateTxt(f)}</td><td class="mono nowrap">${f.last}</td><td class="muted">${esc(f.ctl)}</td><td class="muted">${esc(f.gap)}</td><td>${f.ev.map(evChip).join('')||'<span class="dim">—</span>'}</td></tr>`})))}
+ ${panel('Fix',' ',`<div class="list">${rows.map(f=>{const m=MODELS.find(x=>x.id===f.mk);return `<div class="li"><div class="a"><div>${esc(m?m.n:f.mk)}</div><div class="sub" style="text-transform:none">${esc(f.ctl)} — ${esc(f.gap)}</div></div><button class="btn" data-toast="Change request raised for ${esc(m?m.n:f.mk)} · ${esc(t[1])}">Raise fix</button></div>`}).join('')}</div>`)}`,true)}
+
+function openOwasp(code){const o=OW.find(x=>x[0]===code);if(!o)return;
+ const fails=owFailFor(code),techs=owTechsFailing(code),mods=owModelsFailing(code);
+ const pol=typeof POL!=='undefined'?POL.filter(p=>p.fw.some(f=>f.includes(code))):[];
+ const cat=OWATK[code]||[];
+ const techRows=cat.map(t=>{const fs=fails.filter(f=>f.tech===t[0]);const tested=fs.reduce((s,f)=>s+f.tested,0),failed=fs.reduce((s,f)=>s+f.failed,0);
+  return `<tr ${fs.length?`data-owtech="${code}|${t[0]}"`:''}><td>${esc(t[1])}${fs.length?'':'<span class="s2">no model failing</span>'}</td><td class="muted">${esc(t[2])}</td><td class="mono">${t[3]&&t[3]!=='—'?t[3]:'<span class="dim">—</span>'}</td><td class="r num ${fs.length?'c-crit':'dim'}">${fs.length}</td><td class="r num">${fs.length?fmt(tested):'<span class="dim">—</span>'}</td><td class="r num ${failed?'c-high':'dim'}">${fs.length?failed:'—'}</td><td>${fs.length?chip('failing','bad'):chip('holding','ok')}</td></tr>`});
+ const byModel=mods.map(mk=>{const m=MODELS.find(x=>x.id===mk),fs=fails.filter(f=>f.mk===mk);
+  return `<tr data-msec="${mk}"><td class="mono">${esc(m?m.n:mk)}<span class="s2">${m?m.prov+' · '+m.env:''}</span></td><td>${fs.map(f=>`<span class="tag" style="border-color:var(--high);color:var(--high)">${esc(owTechMeta(code,f.tech)[1])}</span>`).join('')}</td><td class="r num c-crit">${fs.length}</td><td class="r num">${fs.reduce((s,f)=>s+f.failed,0)}</td><td>${m?(m.guard?chip('guardrails on','ok'):chip('no guardrails','warn')):''}</td></tr>`});
+ drawer(`${dhead('OWASP Top 10 for LLM · '+code,esc(o[1]))}
+ <div class="meta">${pill(o[2])}<span class="lbl">Models exposed</span><b class="num c-crit">${mods.length}</b><span class="lbl">Techniques failing</span><b class="num">${techs.length} of ${cat.length}</b><span class="lbl">Bypasses</span><b class="num">${fails.reduce((s,f)=>s+f.failed,0)}</b></div>
+ <p style="margin:0">The tile counts <b>${mods.length}</b> model${mods.length>1?'s':''} because ${mods.length>1?'each of them fails':'it fails'} at least one of the attack techniques below. Select a technique to see exactly where it got through.</p>
+ ${panes([
+  [`Attack techniques (${techs.length}/${cat.length} failing)`,`${tbl(['Technique','What the attacker does','ATLAS','>Models failing','>Tested','>Bypassed','Status'],techRows)}<p class="dim" style="font-size:11.5px;margin:10px 0 0">Techniques marked holding were exercised by the red-team suite with no bypass on any model in scope.</p>`],
+  [`Failing models (${mods.length})`,`${tbl(['Model','Techniques it fails','>Failing','>Bypasses','Runtime'],byModel)}<p class="dim" style="font-size:11.5px;margin:10px 0 0">This is the tile count: ${mods.length} model${mods.length>1?'s':''} with at least one failing technique under ${code}.</p>`],
+  ['Evidence',tbl(['Model','Technique','>Tested','>Bypassed','Rate','Last run','Evidence'],fails.map(f=>{const m=MODELS.find(x=>x.id===f.mk);return `<tr data-owtech="${code}|${f.tech}"><td class="mono">${esc(m?m.n:f.mk)}</td><td>${esc(owTechMeta(code,f.tech)[1])}</td><td class="r num">${fmt(f.tested)}</td><td class="r num c-high">${f.failed}</td><td class="r mono">${owRateTxt(f)}</td><td class="mono nowrap">${f.last}</td><td>${f.ev.map(evChip).join('')||'<span class="dim">—</span>'}</td></tr>`}))],
+  ['Enforcing policies',pol.length?tbl(['Mode','ID','Policy','Action'],pol.map(p=>`<tr data-pol2="${p.id}"><td>${chip(p.mode,p.mode==='Enforce'?'ok':p.mode==='Monitor'?'warn':'off')}</td><td class="mono">${p.id}</td><td>${esc(p.n)}</td><td><span class="tag">${p.act}</span></td></tr>`)):'<p class="muted">No policy is mapped to this risk yet.</p>']])}`,true)}
+
 /* ---------------- render & events ---------------- */
 function render(){
  const v=VIEWS.find(x=>x.k===state.view)||VIEWS[0];
@@ -3228,7 +3357,7 @@ function render(){
  const on=$('#tabs .tab.on');if(on)on.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function go(k){state.view=k;try{history.replaceState(null,'','#'+k)}catch(e){}closeDrawer();render();window.scrollTo(0,0)}
-const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-drift],[data-theft],[data-expo],[data-adv],[data-pois],[data-poisds],[data-det],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
+const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-owtech],[data-drift],[data-theft],[data-expo],[data-adv],[data-pois],[data-poisds],[data-det],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
 document.addEventListener('click',e=>{
  const t=e.target.closest(SPEC);
  if(t){const d=t.dataset;
@@ -3271,6 +3400,7 @@ document.addEventListener('click',e=>{
   if(d.ptpack){const pk=PTPL.find(x=>x[1]===d.ptpack);let n=0;pk[2].forEach(t=>{if(t[2]&&POL.some(p=>p.id===t[2]))return;const w=pwDefault(tplPrefill(t).type,tplPrefill(t));const id='QP-'+(Math.max(...POL.map(p=>parseInt(p.id.slice(3))||0))+1);POL.push({id,n:t[0],cat:t[1],act:w.act,mode:'Monitor',sev:w.sev,fw:[pk[0]],rule:pwRule(w),desc:'Installed from the '+pk[0]+' template pack. Review matches before switching to Enforce.',owner:'you',upd:'05 Oct 2026',ver:1,hits:0});t[2]=id;n++});
    PAUD.unshift(['05 Oct '+new Date().toTimeString().slice(0,5),'you',pk[0],'Installed '+n+(n===1?' template':' templates')+' in Monitor mode']);render();DST.pop();openTemplates();toast(n+(n===1?' policy':' policies')+' added from '+pk[0]+' in Monitor mode');return}
   if(d.pwfrom){const p=POL.find(x=>x.id===d.pwfrom);openWizard({type:p.cat==='gov'?'runtime':p.cat,name:p.n+' (copy)',act:p.act,sev:p.sev});return}
+  if(d.owtech){openOwTech(d.owtech);return}
   if(d.drift){openDrift(d.drift);return}
   if(d.theft){openTheft(d.theft);return}
   if(d.expo){openExposure(d.expo);return}
