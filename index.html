@@ -2081,7 +2081,7 @@ DSV.overview=()=>{
   ${panel('Sensitive asset types',`${fmtN(sobj)} sensitive objects in ${sens.length} assets`,`<div class="bars">${svcTop.map(([s,n])=>`<div class="hrow clickable" data-dsgo="svc|${s}"><span class="n">${s}</span><div class="track"><div class="fill" style="width:${n/svcTop[0][1]*100}%;background:#c76bd6"></div></div><span class="v">${fmtN(n)}</span></div>`).join('')}</div>`)}
   ${panel('Top assets at risk',`${risk.length} of ${fmt(DS.length)} assets at risk`,`<div class="list">${top.map(d=>`<div class="li" data-dsa="${d.id}"><div class="a"><div>${esc(d.name)}</div><div class="sub" style="text-transform:none">${d.svc} · ${d.issues.length} issues</div></div>${scoreEl(d.risk)}</div>`).join('')}</div><div class="btns"><button class="btn" data-dsgo="risk|At risk">View all</button></div>`)}
  </div>
- ${panel('Sensitive data flowing into AI',`${aiFeed.length} sensitive data assets feed models or agents. Hover a node to trace; red edges break policy.`,(()=>{const src=aiFeed.slice(0,6),cons=[...new Set(src.flatMap(d=>d.ai))].slice(0,6);const n=[...src.map((d,i)=>({id:'s'+i,col:0,k:d.cat==='AI Dataset'?'dataset':'storage',l:d.name,m:d.prof.join(' · ')||d.svc,st:d.f.foreign||d.issues.some(x=>x.sev==='critical')?'bad':d.issues.length?'warn':''})),...cons.map((c,i)=>{const a=ASSETS.find(x=>x.name===c);return {id:'c'+i,col:1,k:a&&a.type==='Agent'?'agent':'model',l:c,m:a?a.src:'',asset:a&&a.id}})];const e=src.flatMap((d,i)=>d.ai.filter(c=>cons.includes(c)).map(c=>['s'+i,'c'+cons.indexOf(c),d.pats.length+' patterns',d.f.foreign||d.issues.some(x=>x.sev==='critical')]));return pgraph('dsai',n,e,{head:['Sensitive data asset','AI consumer'],cw:420,nw:240,label:'data to AI'})})())}`;
+ ${panel('Sensitive data flowing into AI',`${aiFeed.length} sensitive data assets feed models or agents. Hover a node to trace; red edges break policy.`,(()=>{const src=aiFeed.slice(0,6),cons=[...new Set(src.flatMap(d=>d.ai))].slice(0,6);const n=[...src.map((d,i)=>({id:'s'+i,col:0,k:d.cat==='AI Dataset'?'dataset':'storage',l:d.name,m:d.prof.join(' · ')||d.svc,st:d.f.foreign||d.issues.some(x=>x.sev==='critical')?'bad':d.issues.length?'warn':''})),...cons.map((c,i)=>{const a=ASSETS.find(x=>x.name===c);return {id:'c'+i,col:1,k:a&&a.type==='Agent'?'agent':'model',l:c,m:a?a.src:'',asset:a&&a.id}})];const e=src.flatMap((d,i)=>d.ai.filter(c=>cons.includes(c)).map(c=>['s'+i,'c'+cons.indexOf(c),d.pats.length+' pattern'+(d.pats.length===1?'':'s'),d.f.foreign||d.issues.some(x=>x.sev==='critical')]));return pgraph('dsai',n,e,{head:['Sensitive data asset','AI consumer'],cw:420,nw:240,label:'data to AI'})})())}`;
 };
 DSV.all=()=>{const pg=state.ds.page,cat=DCAT[pg],base=cat?DS.filter(d=>d.cat===cat):DS,f=state.ds.f;
  const risk=base.filter(d=>d.atRisk).length,sens=base.filter(d=>d.sensitive).length,open=base.filter(d=>d.sensitive&&d.f.open).length;
@@ -3001,7 +3001,7 @@ function expLineage(d){
  cons.forEach((c,i)=>{const a=aiOf(c);nodes.push({id:'c'+i,col:2,k:a&&a.type==='Agent'?'agent':a&&a.type==='MCP server'?'tool':'model',l:c,m:a?a.src:'',asset:a&&a.id,st:a&&a.score>=60?'warn':''})});
  const chans=[...new Set(cons.map(c=>chanOf(aiOf(c))))];
  chans.forEach((c,i)=>nodes.push({id:'o'+i,col:3,k:'channel',l:c,m:''}));
- const edges=[['s0','p0',d.pats.length+' patterns',true]];
+ const edges=[['s0','p0',d.pats.length+' pattern'+(d.pats.length===1?'':'s'),true]];
  cons.forEach((c,i)=>edges.push(['p0','c'+i,i===0?d.prof[0]||'sensitive':'',true]));
  cons.forEach((c,i)=>edges.push(['c'+i,'o'+chans.indexOf(chanOf(aiOf(c))),'']));
  return {nodes,edges};
@@ -3017,7 +3017,7 @@ function openExposure(id){const d=dsBy(id);if(!d)return;const ex=expTypes(d),L=e
  ${panes([['Overview',`<dl class="kv"><dt>Data store</dt><dd class="mono">${esc(d.name)}</dd><dt>Service</dt><dd>${d.svc} · ${d.cat}</dd><dt>Cloud · region</dt><dd>${cdot(d.cloud)} ${d.cloud} · <span class="mono">${d.region}</span></dd><dt>Account</dt><dd class="mono">${esc(d.acct)}</dd><dt>Data profiles</dt><dd>${d.prof.map(pchip).join('')||'—'}</dd><dt>Data patterns</dt><dd>${d.pats.slice(0,6).map(p=>`<span class="tag">${DPAT[p][0]}</span>`).join('')}</dd><dt>Volume</dt><dd class="mono">${d.records?fmtN(d.records)+' records':fmtN(d.objects)+' objects'}</dd><dt>First discovered</dt><dd class="mono">${d.first}</dd><dt>Last classified</dt><dd class="mono">${d.lastcls}</dd></dl>
   ${panel('Why this is exposed',' ',`<div class="list">${ex.map(k=>`<div class="li"><div class="a"><div><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${k[2]};margin-right:6px"></i>${k[1]}</div><div class="sub" style="text-transform:none">${esc(k[4])}</div></div>${pill(k[3])}</div>`).join('')}</div>`)}`],
   ['Lineage',`<p class="muted" style="margin:0 0 10px">Red dashed edges carry sensitive data out of the exposed store. Select an AI node to open its inventory record, or the store to open its data record.</p>
-   ${pgraph('explin'+d.id,L.nodes,L.edges,{head:['Exposed data store','Processing','AI consumer','Channel'],cw:258,nw:196,label:'exposure lineage'})}
+   ${pgraph('explin'+d.id,L.nodes,L.edges,{head:['Exposed sensitive store','How it is reachable','AI consumer','Channel','Who receives it'],cw:258,nw:196,label:'exposure lineage'})}
    ${tbl(['Hop','Where','Kind','What it means'],hops.map(h=>`<tr><td>${esc(h[0])}</td><td class="mono nowrap">${esc(h[1])}</td><td class="muted">${esc(h[2])}</td><td class="muted">${esc(h[3])}</td></tr>`))}`],
   [`AI consumers (${cons.length})`,cons.length?tbl(['Asset','Type','Source','Env','Owner','Status','>Risk'],cons.map(a=>`<tr data-asset="${a.id}"><td>${esc(a.name)}</td><td>${a.type}</td><td class="nowrap">${srcDot(a.src)} ${a.src}</td><td>${a.env}</td><td class="mono">${a.owner}</td><td>${chip(a.status,ST[a.status]||'warn')}</td><td class="r num" style="color:${scoreCol(100-a.score)}">${a.score}</td></tr>`)):'<p class="muted">This store is exposed but no AI asset consumes it. It is still reachable, so it stays in scope for remediation.</p>'],
   ['Evidence',jbox('quilr.dspm.exposure/v1',{data_asset:d.id,name:d.name,service:d.svc,cloud:d.cloud,region:d.region,account:d.acct,classification:d.prof,exposure:ex.map(k=>k[0]),severity:expSev(d),risk_score:d.risk,sensitive_patterns:d.pats.map(p=>DPAT[p][0]),ai_consumers:cons.map(a=>({id:a.id,name:a.name,type:a.type,source:a.src})),channel:cons.length?chanOf(cons[0]):null,detector:'quilr-dspm-exposure'})]])}
@@ -3343,6 +3343,135 @@ function openOwasp(code){const o=OW.find(x=>x[0]===code);if(!o)return;
   ['Evidence',tbl(['Model','Technique','>Tested','>Bypassed','Rate','Last run','Evidence'],fails.map(f=>{const m=MODELS.find(x=>x.id===f.mk);return `<tr data-owtech="${code}|${f.tech}"><td class="mono">${esc(m?m.n:f.mk)}</td><td>${esc(owTechMeta(code,f.tech)[1])}</td><td class="r num">${fmt(f.tested)}</td><td class="r num c-high">${f.failed}</td><td class="r mono">${owRateTxt(f)}</td><td class="mono nowrap">${f.last}</td><td>${f.ev.map(evChip).join('')||'<span class="dim">—</span>'}</td></tr>`}))],
   ['Enforcing policies',pol.length?tbl(['Mode','ID','Policy','Action'],pol.map(p=>`<tr data-pol2="${p.id}"><td>${chip(p.mode,p.mode==='Enforce'?'ok':p.mode==='Monitor'?'warn':'off')}</td><td class="mono">${p.id}</td><td>${esc(p.n)}</td><td><span class="tag">${p.act}</span></td></tr>`)):'<p class="muted">No policy is mapped to this risk yet.</p>']])}`,true)}
 
+/* ---------------- Exposure → AI lineage: channels, audiences and the log chain ---------------- */
+const CHAN={
+ cust_chat:['Customer web chat & mobile app','Retail customers · external','Session cookie + OTP',true,'Response DLP (QP-11) · session rate limit · no export','Anything the agent returns renders in the customer’s own browser, where it can be read, copied or screenshotted. This is the widest audience any exposed record can reach.'],
+ ops_hr:['HR & payroll console','HR and payroll staff · 64 internal users',' Entra ID SSO + conditional access',false,'Response DLP · role check on the agent','Returned text is visible to any HR user who has the agent enabled, including contractors in that group.'],
+ ops_trade:['Trade finance console','Trade operations · 88 internal users','Entra ID SSO',false,'Response DLP · maker-checker on actions','Visible to the whole trade-ops group; documents can be downloaded from the console.'],
+ ops_treasury:['Treasury dealing desk','Treasury operations · 64 internal users','Entra ID SSO + device compliance',false,'Response DLP · export blocked','Restricted to compliant devices on the dealing desk, but the full response is shown on screen.'],
+ branch:['Branch staff console','Branch staff · 1,412 internal users','Entra ID SSO',false,'Response DLP · per-branch scoping','The largest internal audience in the bank — a leaked record reaches every branch user with the agent.'],
+ api:['Inference API','Service accounts and partner API · 37 callers','API key / IAM SigV4',true,'Gateway DLP on responses · per-key budget','Whatever the model returns goes straight to the calling service. 9 of the 37 callers sit outside the bank’s own accounts.'],
+ rag:['RAG retrieval into assistants','Any grounded assistant · 54 agents','Inherited from the calling agent',false,'Retrieval ACL filter (gap) · response DLP','Retrieved chunks become context for every assistant that queries the index, so one exposed record spreads across all of them.'],
+ tool:['Agent tool calls','Autonomous agents · 61','Signed agent identity (mTLS)',false,'MCP gateway scope enforcement · approval on writes','Data returned to an agent can be chained into a later tool call, including an outbound send.']};
+function chanFor(a){if(!a)return 'api';const n=a.name||'',t=a.type||'';
+ if(/e5|embed|multilingual/i.test(n))return 'rag';
+ if(t==='MCP server')return 'tool';
+ if(t==='Agent'){if(/Wealth|Advisor|Support|CX|Customer/i.test(n))return 'cust_chat';if(/Payroll|HR/i.test(n))return 'ops_hr';if(/Trade|LC/i.test(n))return 'ops_trade';if(/Treasury|FX/i.test(n))return 'ops_treasury';return 'branch'}
+ return 'api'}
+const PROCLBL=d=>PROCOF(d);
+const EXH=x=>{let h=2166136261;for(let i=0;i<x.length;i++){h^=x.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};
+const EXPATHS=[];(function(){let n=1;
+ EXPAI.slice().sort((a,b)=>b.risk-a.risk).forEach(d=>{(d.ai||[]).forEach(cn=>{const a=aiOf(cn);if(!a)return;
+  const h=EXH(d.id+cn),ck=chanFor(a),day=['05 Oct','04 Oct','03 Oct'][h%3],hh=7+(h>>3)%12,mm=(h>>6)%60;
+  EXPATHS.push({id:'XP-'+String(n++).padStart(3,'0'),d,a,ck,
+   last:day+' '+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'),
+   recs:120+(h>>4)%9400, reqs:40+(h>>7)%2600, h});});});})();
+const pathsForChan=ck=>EXPATHS.filter(p=>p.ck===ck);
+function exChain(p){const c=CHAN[p.ck],d=p.d,a=p.a,h=p.h;
+ const cloudLog={AWS:['AWS CloudTrail','s3.amazonaws.com','GetObject'],Azure:['Azure Activity log','Microsoft.Storage','ListKeys/Read'],GCP:['GCP Cloud Audit','storage.googleapis.com','storage.objects.get'],Databricks:['Databricks audit','unityCatalog','getTable'],'Microsoft 365':['Purview audit','SharePoint','FileAccessed'],Salesforce:['Salesforce event log','API','QueryAll']}[d.cloud]||['Cloud audit','storage','Read'];
+ return [
+  {n:1,t:p.last.replace(/:\d\d$/,':02'),src:cloudLog[0],title:'Exposed store read',
+   sum:`${cloudLog[2]} on ${d.name} by the ${PROCLBL(d)} identity — the store is still ${expTypes(d).map(k=>k[1].toLowerCase()).join(' and ')}.`,
+   log:{event_source:cloudLog[1],event_name:cloudLog[2],resource:d.name,account:d.acct,region:d.region,principal:'svc-'+PROCLBL(d).split(' ')[0].toLowerCase()+'-runner',source_ip:'10.'+(h%60)+'.'+((h>>4)%250)+'.'+((h>>8)%250),records_read:p.recs,exposure_on_resource:expTypes(d).map(k=>k[0]),classification:d.prof,read_only:true}},
+  {n:2,t:p.last.replace(/:\d\d$/,':09'),src:'Pipeline run log',title:'Moved into the AI path',
+   sum:`${PROCLBL(d)} carried ${fmt(p.recs)} records with ${d.pats.length} sensitive pattern${d.pats.length===1?'':'s'} into ${a.name}.`,
+   log:{job:PROCLBL(d).replace(/[^a-z]+/gi,'-').toLowerCase()+'-'+(1000+(h>>5)%8999),status:'succeeded',source:d.name,target:a.name,records:p.recs,sensitive_patterns:d.pats.slice(0,4).map(x=>DPAT[x][0]),duration_s:12+(h>>6)%300,masking_applied:false}},
+  {n:3,t:p.last,src:'Quilr AI Gateway',title:'Entered the model context',
+   sum:`${a.name} processed ${fmt(p.reqs)} requests grounded on this data in the last 7 days.`,
+   log:{model:a.name,provider:a.src,requests_7d:p.reqs,context_source:d.name,stage:a.type==='Agent'?'retrieval + tool result':'inference input',dlp_on_response:true,detections_7d:(h>>9)%14,policy:'QP-11'}},
+  {n:4,t:p.last.replace(/:(\d\d)$/,(m,s)=>':'+String((+s+3)%60).padStart(2,'0')),src:'Channel delivery log',title:'Surfaced on the channel',
+   sum:`Responses delivered to ${c[1]}${c[3]?' — this audience is outside the bank':''}.`,
+   log:{channel:c[0],audience:c[1],external:c[3],authentication:c[2],deliveries_7d:p.reqs,redactions_7d:(h>>11)%40,controls:c[4].split(' · '),residual_exposure:c[5]}}];
+}
+function openChannel(ck){const c=CHAN[ck];if(!c)return;const ps=pathsForChan(ck);
+ drawer(`${dhead('Exposure channel',c[0])}
+ <div class="meta">${c[3]?chip('external audience','bad'):chip('internal audience','warn')}<span class="lbl">Audience</span><span style="color:var(--fg)">${esc(c[1])}</span><span class="lbl">Paths reaching it</span><b class="num c-crit">${ps.length}</b></div>
+ <p style="margin:0">${esc(c[5])}</p>
+ ${panel('Channel controls',' ',`<dl class="kv"><dt>Channel</dt><dd>${esc(c[0])}</dd><dt>Audience</dt><dd>${esc(c[1])}</dd><dt>Reachable from outside</dt><dd>${c[3]?chip('yes','bad'):chip('no','ok')}</dd><dt>Authentication</dt><dd>${esc(c[2])}</dd><dt>Controls in place</dt><dd>${c[4].split(' · ').map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</dd></dl>`)}
+ ${ps.length?panel('Exposed data reaching this channel','Each row is a path from an exposed store, through an AI asset, out to this channel. Select one for its log chain.',tbl(['Path','Exposed store','Exposure','AI consumer','>Records','Last observed'],ps.map(p=>`<tr data-expath="${p.id}"><td class="mono">${p.id}</td><td class="mono">${esc(p.d.name)}</td><td>${expTypes(p.d).map(k=>`<span class="tag" style="border-color:${k[2]};color:${k[2]}">${k[1]}</span>`).join('')}</td><td>${esc(p.a.name)}</td><td class="r num">${fmt(p.recs)}</td><td class="mono nowrap">${p.last}</td></tr>`))):''}`,true)}
+
+function pathGraph(p,gid){const d=p.d,a=p.a,c=CHAN[p.ck],ex=expTypes(d);
+ const nodes=[{id:'s',col:0,k:d.cat==='AI Dataset'?'dataset':d.cat==='Database'?'source':'storage',l:d.name,m:d.svc+' · '+d.cloud+' '+d.region,dsa:d.id,st:'bad'},
+  {id:'e',col:1,k:'finding',l:ex.map(k=>k[1]).join(' + '),m:d.acct,st:'bad'},
+  {id:'c',col:2,k:a.type==='Agent'?'agent':a.type==='MCP server'?'tool':'model',l:a.name,m:a.src,asset:a.id},
+  {id:'h',col:3,k:'channel',l:c[0],m:c[2]},
+  {id:'u',col:4,k:c[3]?'finding':'identity',l:c[1],m:c[3]?'outside the bank':'internal',st:c[3]?'bad':'warn'}];
+ const edges=[['s','e',d.pats.length+' pattern'+(d.pats.length===1?'':'s'),true],['e','c',PROCLBL(d),true],['c','h',fmt(p.reqs)+' responses',true],['h','u',c[3]?'external':'internal',c[3]]];
+ return pgraph(gid,nodes,edges,{head:['Exposed sensitive store','How it is reachable','AI consumer','Channel','Who receives it'],cw:252,nw:210,label:'exposure path'});}
+
+function openExPath(id){const p=EXPATHS.find(x=>x.id===id);if(!p)return;const c=CHAN[p.ck],ch=exChain(p),ex=expTypes(p.d);
+ drawer(`${dhead('Exposure lineage · '+p.id,esc(p.d.name)+' → '+esc(p.a.name))}
+ <div class="meta">${pill(expSev(p.d))}${ex.map(k=>`<span class="tag" style="border-color:${k[2]};color:${k[2]}">${k[1]}</span>`).join('')}${c[3]?chip('external audience','bad'):chip('internal audience','warn')}<span class="lbl">Records</span><b class="num">${fmt(p.recs)}</b></div>
+ <p style="margin:0">${fmt(p.recs)} sensitive records move from an exposed ${p.d.cat.toLowerCase()} into <b>${esc(p.a.name)}</b>, whose responses surface on <b>${esc(c[0])}</b> to ${esc(c[1])}.</p>
+ ${panes([
+  ['Path',`${pathGraph(p,'xp'+p.id)}
+   ${tbl(['Hop','Stage','What happens here','Control'],[
+    ['1','Exposed store',`${p.d.name} · ${p.d.svc} ${p.d.cloud} ${p.d.region}`,ex.map(k=>k[1]).join(', ')+' — not remediated'],
+    ['2','Exposure path',`Reachable because: ${ex.map(k=>k[4]).join(' ')}`,'Bucket / share policy'],
+    ['3','Processing',`${PROCLBL(p.d)} moves ${fmt(p.recs)} records with no masking applied`,'No field-level masking on this path'],
+    ['4','AI consumer',`${p.a.name} (${p.a.type} · ${p.a.src}) grounds ${fmt(p.reqs)} responses on it`,'Gateway response DLP (QP-11)'],
+    ['5','Channel',`${c[0]} · authentication: ${c[2]}`,c[4]],
+    ['6','Audience',`${c[1]}`,c[3]?'Outside the bank — highest residual exposure':'Internal only']
+   ].map(r=>`<tr><td class="mono">${r[0]}</td><td>${r[1]}</td><td class="muted">${esc(r[2])}</td><td class="muted">${esc(r[3])}</td></tr>`))}`],
+  ['Exposure log',`<p class="muted" style="margin:0 0 10px">The four records below are the chain of evidence for this path, in order: the store being read, the job that moved it, the model consuming it, and the channel it surfaced on.</p>
+   ${ch.map(s=>`${panel(s.n+'. '+s.title,`${s.t} · ${s.src}`,`<p style="margin:0 0 10px">${esc(s.sum)}</p>${jbox(s.src+' · JSON',s.log)}`)}`).join('')}`],
+  ['Channel exposure',`<dl class="kv"><dt>Channel</dt><dd>${esc(c[0])}</dd><dt>Audience</dt><dd>${esc(c[1])}</dd><dt>Reachable from outside</dt><dd>${c[3]?chip('yes','bad'):chip('no','ok')}</dd><dt>Authentication</dt><dd>${esc(c[2])}</dd><dt>Controls</dt><dd>${c[4].split(' · ').map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</dd><dt>Responses · 7d</dt><dd class="num">${fmt(p.reqs)}</dd><dt>Other paths to this channel</dt><dd class="num">${pathsForChan(p.ck).length-1}</dd></dl>
+   <p style="margin:10px 0 0"><b>Residual exposure.</b> ${esc(c[5])}</p>
+   <div class="btns"><button class="btn" data-chan="${p.ck}">Open channel</button></div>`],
+  ['Evidence',jbox('quilr.dspm.exposure_path/v1',{path_id:p.id,store:{id:p.d.id,name:p.d.name,service:p.d.svc,cloud:p.d.cloud,region:p.d.region,exposure:ex.map(k=>k[0]),classification:p.d.prof},processing:PROCLBL(p.d),ai_consumer:{id:p.a.id,name:p.a.name,type:p.a.type,source:p.a.src},channel:{key:p.ck,name:c[0],audience:c[1],external:c[3],authentication:c[2]},records_in_scope:p.recs,responses_7d:p.reqs,last_observed:p.last,chain:ch.map(s=>({step:s.n,at:s.t,source:s.src,event:s.title}))})]])}
+ <div class="btns"><button class="btn pri" data-toast="Remediation ticket opened for ${esc(p.d.name)}">Create ticket</button><button class="btn" data-expo="${p.d.id}">Open exposure record</button><button class="btn" data-asset="${p.a.id}">Open AI asset</button></div>`,true)}
+
+/* richer per-store lineage used by the exposure drawer */
+function expLineage(d){
+ const cons=(d.ai||[]).slice(0,4),ex=expTypes(d);
+ const nodes=[{id:'s0',col:0,k:d.cat==='AI Dataset'?'dataset':d.cat==='Database'?'source':'storage',l:d.name,m:d.svc+' · '+d.cloud+' '+d.region,dsa:d.id,st:'bad'},
+  {id:'e0',col:1,k:'finding',l:ex.map(k=>k[1]).join(' + ')||'exposed',m:d.acct,st:'bad'}];
+ if(!cons.length)nodes.push({id:'c0',col:2,k:'finding',l:'No AI consumer',m:'exposed but not feeding AI'});
+ cons.forEach((c,i)=>{const a=aiOf(c);nodes.push({id:'c'+i,col:2,k:a&&a.type==='Agent'?'agent':a&&a.type==='MCP server'?'tool':'model',l:c,m:a?a.src:'',asset:a&&a.id})});
+ const cks=[...new Set(cons.map(c=>chanFor(aiOf(c))))];
+ cks.forEach((k,i)=>nodes.push({id:'h'+i,col:3,k:'channel',l:CHAN[k][0],m:CHAN[k][2]}));
+ const auds=[...new Set(cks.map(k=>CHAN[k][1]))];
+ auds.forEach((a,i)=>nodes.push({id:'u'+i,col:4,k:/external/.test(a)?'finding':'identity',l:a,m:/external/.test(a)?'outside the bank':'internal',st:/external/.test(a)?'bad':'warn'}));
+ const edges=[['s0','e0',d.pats.length+' pattern'+(d.pats.length===1?'':'s'),true]];
+ cons.forEach((c,i)=>edges.push(['e0','c'+i,i===0?PROCLBL(d):'',true]));
+ cons.forEach((c,i)=>{const k=chanFor(aiOf(c));edges.push(['c'+i,'h'+cks.indexOf(k),'',true]);});
+ cks.forEach((k,i)=>edges.push(['h'+i,'u'+auds.indexOf(CHAN[k][1]),/external/.test(CHAN[k][1])?'external':'internal',/external/.test(CHAN[k][1])]));
+ return {nodes,edges};
+}
+
+DSV.exposure=()=>{
+ const N=state.ds.n||50;
+ const rows=EXPOSED.slice().sort((a,b)=>(b.ai.length>0)-(a.ai.length>0)||sevRank[expSev(a)]-sevRank[expSev(b)]||b.risk-a.risk);
+ const byK=EXPK.map(k=>[k,DS.filter(d=>d.sensitive&&d.f[k[0]]).length]);
+ const consumers={};EXPAI.forEach(d=>d.ai.forEach(n=>{consumers[n]=consumers[n]||{n,stores:0,pats:new Set()};consumers[n].stores++;d.pats.forEach(p=>consumers[n].pats.add(p))}));
+ const cons=Object.values(consumers).sort((a,b)=>b.stores-a.stores);
+ const ext=EXPATHS.filter(p=>CHAN[p.ck][3]);
+ /* aggregate graph: store -> how it is reachable -> AI consumer -> channel -> audience */
+ const tp=EXPATHS.slice(0,5),gn=[],ge=[];
+ const stores=[...new Set(tp.map(p=>p.d.id))];
+ stores.forEach((id,i)=>{const d=dsBy(id);gn.push({id:'s'+i,col:0,k:d.cat==='AI Dataset'?'dataset':d.cat==='Database'?'source':'storage',l:d.name,m:d.svc+' · '+d.cloud,dsa:d.id,st:'bad'});
+  gn.push({id:'e'+i,col:1,k:'finding',l:expTypes(d).map(k=>k[1]).join(' + '),m:d.region,st:'bad'});
+  ge.push(['s'+i,'e'+i,d.pats.length+' pattern'+(d.pats.length===1?'':'s'),true])});
+ const cns=[...new Set(tp.map(p=>p.a.id))];
+ cns.forEach((aid,i)=>{const a=ASSETS.find(x=>x.id===aid);gn.push({id:'c'+i,col:2,k:a.type==='Agent'?'agent':a.type==='MCP server'?'tool':'model',l:a.name,m:a.src,asset:a.id})});
+ const cks=[...new Set(tp.map(p=>p.ck))];
+ cks.forEach((k,i)=>gn.push({id:'h'+i,col:3,k:'channel',l:CHAN[k][0],m:CHAN[k][2]}));
+ const auds=[...new Set(cks.map(k=>CHAN[k][1]))];
+ auds.forEach((a,i)=>gn.push({id:'u'+i,col:4,k:/external/.test(a)?'finding':'identity',l:a,m:/external/.test(a)?'outside the bank':'internal',st:/external/.test(a)?'bad':'warn'}));
+ tp.forEach(p=>{const si=stores.indexOf(p.d.id),ci=cns.indexOf(p.a.id),hi=cks.indexOf(p.ck);
+  ge.push(['e'+si,'c'+ci,PROCLBL(p.d),true]);ge.push(['c'+ci,'h'+hi,fmt(p.reqs)+' responses',true])});
+ cks.forEach((k,i)=>ge.push(['h'+i,'u'+auds.indexOf(CHAN[k][1]),/external/.test(CHAN[k][1])?'external':'internal',/external/.test(CHAN[k][1])]));
+ return `${secH('Sensitive data exposure','Sensitive stores that are reachable beyond their intended boundary, and the lineage from each one into the AI assets that consume it and the channel it finally surfaces on. Select a store or a path for its full chain of evidence.')}
+ ${kpis([['Sensitive stores',fmt(DS.filter(d=>d.sensitive).length),'','classified Restricted or Confidential'],['Exposed',EXPOSED.length,'c-high','reachable beyond their boundary'],['Reaching AI',EXPAI.length,'c-crit','exposed and feeding a model or agent'],['Lineage paths',EXPATHS.length,'c-high','store → AI → channel'],['Reaching an external audience',ext.length,'c-crit','customers, partners or public APIs'],['Outside India',DS.filter(d=>d.sensitive&&d.f.foreign).length,'c-high','DPDP / RBI localisation']])}
+ <div class="grid g21">
+  ${panel('Exposure detection by type','How each exposed store is reachable. Select a type to filter the data inventory.',`<div class="bars">${byK.map(([k,n])=>`<div class="hrow clickable" data-dsgo="exp|${k[1]==='Weak or no encryption'?'Open to world':k[1]};risk|Sensitive"><span class="n">${k[1]}</span><div class="track"><div class="fill" style="width:${n/Math.max(...byK.map(x=>x[1]))*100}%;background:${k[2]}"></div></div><span class="v">${n}</span></div>`).join('')}</div><p class="dim" style="font-size:11.5px;margin:10px 0 0">${EXPOSED.length} distinct stores carry at least one of these exposures; ${EXPAI.length} of them feed an AI asset.</p>`)}
+  ${panel('Channels the exposed data reaches','Where a response built on exposed data finally surfaces, and who can read it. Select a channel for its controls and paths.',`<div class="list">${Object.keys(CHAN).filter(k=>pathsForChan(k).length).sort((a,b)=>pathsForChan(b).length-pathsForChan(a).length).map(k=>{const c=CHAN[k],n=pathsForChan(k).length;return `<div class="li clickable" data-chan="${k}"><div class="a"><div>${esc(c[0])}</div><div class="sub" style="text-transform:none">${esc(c[1])} · ${esc(c[2])}</div></div><span class="mono" style="margin-right:8px">${n} path${n>1?'s':''}</span>${c[3]?chip('external','bad'):chip('internal','warn')}</div>`}).join('')}</div>`)}
+ </div>
+ ${panel('Exposure → AI lineage','Each row of the graph runs from an exposed store, through the reason it is reachable, into the AI asset that consumes it, out to the channel it surfaces on and the audience that can read it. Red dashed edges carry sensitive data; select any node to open its record.',pgraph('expagg',gn,ge,{head:['Exposed sensitive store','How it is reachable','AI consumer','Channel','Who receives it'],cw:252,nw:210,label:'exposure to AI lineage'})+`<p class="dim" style="font-size:11.5px;margin:10px 0 0">Showing the ${tp.length} highest-risk of ${EXPATHS.length} paths. Select a path below for its four-step exposure log.</p>`)}
+ ${panel('Lineage paths',`${EXPATHS.length} paths from an exposed store to a channel. Select a path for the chain of evidence — the store being read, the job that moved it, the model that consumed it and the channel it surfaced on.`,tbl(['Path','Exposed store','How it is reachable','AI consumer','Channel','Audience','>Records','>Responses · 7d','Last observed'],EXPATHS.map(p=>{const c=CHAN[p.ck];return `<tr data-expath="${p.id}"><td class="mono">${p.id}</td><td class="mono">${esc(p.d.name)}<span class="s2">${p.d.svc} · ${p.d.cloud}</span></td><td>${expTypes(p.d).map(k=>`<span class="tag" style="border-color:${k[2]};color:${k[2]}">${k[1]}</span>`).join('')}</td><td>${esc(p.a.name)}<span class="s2">${p.a.type}</span></td><td>${esc(c[0])}</td><td class="${c[3]?'c-crit':'muted'}">${esc(c[1])}</td><td class="r num">${fmt(p.recs)}</td><td class="r num">${fmt(p.reqs)}</td><td class="mono nowrap">${p.last}</td></tr>`})))}
+ ${panel('Exposed sensitive data assets',`${EXPOSED.length} exposed stores, those reaching AI first. Select a store for its lineage, AI consumers and evidence.`,tbl(['>Risk','Data store','Service','Cloud · region','Profiles','Exposure','>Patterns','AI consumers'],rows.slice(0,N).map(d=>`<tr data-expo="${d.id}"><td class="r"><span class="num" style="color:${scoreCol(100-d.risk)};font-weight:600">${d.risk}</span></td><td>${esc(d.name)}<span class="s2">${d.cat} · ${d.issues.length} issues</span></td><td class="muted">${d.svc}</td><td class="nowrap">${cdot(d.cloud)} ${d.cloud}<span class="s2">${d.region}</span></td><td>${chipsN(d.prof,2,pchip)}</td><td>${expTypes(d).map(k=>`<span class="tag" style="border-color:${k[2]};color:${k[2]}">${k[1]}</span>`).join('')}</td><td class="r num">${d.pats.length}</td><td>${d.ai.length?`<b class="c-crit">${d.ai.length}</b> <span class="muted">${esc(d.ai.slice(0,2).join(', '))}${d.ai.length>2?' +'+(d.ai.length-2):''}</span>`:'<span class="dim">none</span>'}</td></tr>`))+(rows.length>N?`<div class="btns"><button class="btn" data-dsmore="50">Show 50 more</button><button class="btn" data-dsmore="all">Show all ${rows.length}</button></div>`:''))}`;
+};
+
 /* ---------------- render & events ---------------- */
 function render(){
  const v=VIEWS.find(x=>x.k===state.view)||VIEWS[0];
@@ -3357,7 +3486,7 @@ function render(){
  const on=$('#tabs .tab.on');if(on)on.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function go(k){state.view=k;try{history.replaceState(null,'','#'+k)}catch(e){}closeDrawer();render();window.scrollTo(0,0)}
-const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-owtech],[data-drift],[data-theft],[data-expo],[data-adv],[data-pois],[data-poisds],[data-det],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
+const SPEC='[data-close],[data-back],[data-copy],[data-pane],[data-toast],[data-gn],[data-nav],[data-seg],[data-asset],[data-svc],[data-agent],[data-wl],[data-fw],[data-ctrl],[data-flow],[data-gw],[data-pnew],[data-ptpl],[data-pcf],[data-pol2],[data-pmode],[data-pwtype],[data-pwadd],[data-pwdel],[data-pwtest],[data-pwsave],[data-ptuse],[data-ptpack],[data-pwfrom],[data-expath],[data-chan],[data-owtech],[data-drift],[data-theft],[data-expo],[data-adv],[data-pois],[data-poisds],[data-det],[data-pplat],[data-pbench],[data-pchk],[data-pof],[data-pomore],[data-msec],[data-scan],[data-owasp],[data-msuite],[data-mctrl],[data-mab],[data-cacct],[data-ccat],[data-cfind],[data-cexp],[data-sbom],[data-oss],[data-repo],[data-sstage],[data-apsel],[data-apf],[data-apfix],[data-apopen],[data-apreset],[data-apch],[data-mcpe],[data-ctl],[data-dsp],[data-dsf],[data-dsgo],[data-dsa],[data-dsi],[data-dst],[data-dsik],[data-dsmore],[data-dsreset],[data-dsr],[data-surf],[data-exfil],[data-protint],[data-resid],[data-exlog],[data-pane-go],[data-railtg],[data-viol],[data-vf],[data-vreset],[data-estate],[data-more],[data-if],[data-ireset],[data-iq],[data-sort],[data-src],[data-srcmore],[data-conn],[data-path],[data-trace],[data-pol]';
 document.addEventListener('click',e=>{
  const t=e.target.closest(SPEC);
  if(t){const d=t.dataset;
@@ -3400,6 +3529,8 @@ document.addEventListener('click',e=>{
   if(d.ptpack){const pk=PTPL.find(x=>x[1]===d.ptpack);let n=0;pk[2].forEach(t=>{if(t[2]&&POL.some(p=>p.id===t[2]))return;const w=pwDefault(tplPrefill(t).type,tplPrefill(t));const id='QP-'+(Math.max(...POL.map(p=>parseInt(p.id.slice(3))||0))+1);POL.push({id,n:t[0],cat:t[1],act:w.act,mode:'Monitor',sev:w.sev,fw:[pk[0]],rule:pwRule(w),desc:'Installed from the '+pk[0]+' template pack. Review matches before switching to Enforce.',owner:'you',upd:'05 Oct 2026',ver:1,hits:0});t[2]=id;n++});
    PAUD.unshift(['05 Oct '+new Date().toTimeString().slice(0,5),'you',pk[0],'Installed '+n+(n===1?' template':' templates')+' in Monitor mode']);render();DST.pop();openTemplates();toast(n+(n===1?' policy':' policies')+' added from '+pk[0]+' in Monitor mode');return}
   if(d.pwfrom){const p=POL.find(x=>x.id===d.pwfrom);openWizard({type:p.cat==='gov'?'runtime':p.cat,name:p.n+' (copy)',act:p.act,sev:p.sev});return}
+  if(d.expath){openExPath(d.expath);return}
+  if(d.chan){openChannel(d.chan);return}
   if(d.owtech){openOwTech(d.owtech);return}
   if(d.drift){openDrift(d.drift);return}
   if(d.theft){openTheft(d.theft);return}
